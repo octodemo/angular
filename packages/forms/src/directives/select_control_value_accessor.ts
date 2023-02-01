@@ -6,11 +6,13 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Directive, ElementRef, forwardRef, Host, Input, OnDestroy, Optional, Renderer2, StaticProvider} from '@angular/core';
+import {Directive, ElementRef, forwardRef, Host, Input, OnDestroy, Optional, Provider, Renderer2, ɵRuntimeError as RuntimeError} from '@angular/core';
+
+import {RuntimeErrorCode} from '../errors';
 
 import {BuiltInControlValueAccessor, ControlValueAccessor, NG_VALUE_ACCESSOR} from './control_value_accessor';
 
-export const SELECT_VALUE_ACCESSOR: StaticProvider = {
+const SELECT_VALUE_ACCESSOR: Provider = {
   provide: NG_VALUE_ACCESSOR,
   useExisting: forwardRef(() => SelectControlValueAccessor),
   multi: true
@@ -107,7 +109,9 @@ export class SelectControlValueAccessor extends BuiltInControlValueAccessor impl
   @Input()
   set compareWith(fn: (o1: any, o2: any) => boolean) {
     if (typeof fn !== 'function' && (typeof ngDevMode === 'undefined' || ngDevMode)) {
-      throw new Error(`compareWith must be a function, but received ${JSON.stringify(fn)}`);
+      throw new RuntimeError(
+          RuntimeErrorCode.COMPAREWITH_NOT_A_FN,
+          `compareWith must be a function, but received ${JSON.stringify(fn)}`);
     }
     this._compareWith = fn;
   }
@@ -115,16 +119,12 @@ export class SelectControlValueAccessor extends BuiltInControlValueAccessor impl
   private _compareWith: (o1: any, o2: any) => boolean = Object.is;
 
   /**
-   * Sets the "value" property on the input element. The "selectedIndex"
-   * property is also set if an ID is provided on the option element.
+   * Sets the "value" property on the select element.
    * @nodoc
    */
   writeValue(value: any): void {
     this.value = value;
     const id: string|null = this._getOptionId(value);
-    if (id == null) {
-      this.setProperty('selectedIndex', -1);
-    }
     const valueString = _buildValueString(id, value);
     this.setProperty('value', valueString);
   }

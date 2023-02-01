@@ -27,19 +27,18 @@ ts_library(
         "//packages/compiler-cli/src/ngtsc/testing",
         "//packages/compiler-cli/src/ngtsc/transform",
         "//packages/compiler-cli/src/ngtsc/translator",
+        "@npm//@jridgewell/sourcemap-codec",
         "@npm//@types/convert-source-map",
-        "@npm//convert-source-map",
+        "@npm//@types/yargs",
         "@npm//dependency-graph",
         "@npm//magic-string",
-        "@npm//sourcemap-codec",
         "@npm//typescript",
-        "@npm//yargs",
     ],
 )
 
 jasmine_node_test(
     name = "test",
-    bootstrap = ["//tools/testing:node_no_angular_es5"],
+    bootstrap = ["//tools/testing:node_no_angular"],
     data = [
         "//packages/compiler-cli/src/ngtsc/testing/fake_core:npm_package",
     ],
@@ -61,6 +60,7 @@ ts_library(
         "//packages/compiler-cli/src/ngtsc/file_system/testing",
         "//packages/compiler-cli/src/ngtsc/logging/testing",
         "//packages/compiler-cli/src/ngtsc/testing",
+        "@npm//@bazel/runfiles",
         "@npm//rxjs",
         "@npm//typescript",
     ],
@@ -91,7 +91,7 @@ babel(
 jasmine_node_test(
     name = "integration",
     timeout = "long",
-    bootstrap = ["//tools/testing:node_no_angular_es5"],
+    bootstrap = ["//tools/testing:node_no_angular"],
     data = [
         ":fesm5_angular_core",
         "@npm//@angular/common-12",
@@ -99,15 +99,9 @@ jasmine_node_test(
         "@npm//rxjs",
     ],
     shard_count = 4,
-    tags = ["ivy-only"],
-    templated_args = [
-        # TODO(josephperrott): update dependency usages to no longer need bazel patch module resolver
-        # See: https://github.com/bazelbuild/rules_nodejs/wiki#--bazel_patch_module_resolver-now-defaults-to-false-2324
-        "--bazel_patch_module_resolver",
-    ],
+    tags = [],
     deps = [
         ":integration_lib",
-        "@npm//canonical-path",
         "@npm//convert-source-map",
     ],
 )

@@ -6,10 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {getDebugContext, getErrorLogger, getOriginalError} from './errors';
-import {DebugContext} from './view/types';
-
-
+import {getOriginalError} from './util/errors';
 
 /**
  * Provides a hook for centralized exception handling.
@@ -44,23 +41,11 @@ export class ErrorHandler {
 
   handleError(error: any): void {
     const originalError = this._findOriginalError(error);
-    const context = this._findContext(error);
-    // Note: Browser consoles show the place from where console.error was called.
-    // We can use this to give users additional information about the error.
-    const errorLogger = getErrorLogger(error);
 
-    errorLogger(this._console, `ERROR`, error);
+    this._console.error('ERROR', error);
     if (originalError) {
-      errorLogger(this._console, `ORIGINAL ERROR`, originalError);
+      this._console.error('ORIGINAL ERROR', originalError);
     }
-    if (context) {
-      errorLogger(this._console, 'ERROR CONTEXT', context);
-    }
-  }
-
-  /** @internal */
-  _findContext(error: any): DebugContext|null {
-    return error ? (getDebugContext(error) || this._findContext(getOriginalError(error))) : null;
   }
 
   /** @internal */

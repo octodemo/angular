@@ -123,7 +123,7 @@ export function patchEventTarget(
     let error;
     try {
       task.invoke(task, target, [event]);
-    } catch (err) {
+    } catch (err: any) {
       error = err;
     }
     const options = task.options;
@@ -396,7 +396,7 @@ export function patchEventTarget(
         const options = buildEventListenerOptions(arguments[2], passive);
 
         if (unpatchedEvents) {
-          // check upatched list
+          // check unpatched list
           for (let i = 0; i < unpatchedEvents.length; i++) {
             if (eventName === unpatchedEvents[i]) {
               if (passive) {

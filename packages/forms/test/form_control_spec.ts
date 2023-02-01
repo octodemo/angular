@@ -7,9 +7,8 @@
  */
 
 import {fakeAsync, tick} from '@angular/core/testing';
-import {FormControl, FormGroup, Validators} from '@angular/forms';
+import {AsyncValidatorFn, FormArray, FormControl, FormGroup, Validators} from '@angular/forms';
 
-import {FormArray} from '@angular/forms/src/model';
 import {asyncValidator, asyncValidatorReturningObservable} from './util';
 
 (function() {
@@ -17,7 +16,7 @@ function otherAsyncValidator() {
   return Promise.resolve({'other': true});
 }
 
-function syncValidator(_: any /** TODO #9100 */): any /** TODO #9100 */ {
+function syncValidator() {
   return null;
 }
 
@@ -59,7 +58,8 @@ describe('FormControl', () => {
     });
 
     it('should not treat objects as boxed values if they have more than two props', () => {
-      const c = new FormControl({value: '', disabled: true, test: 'test'}, null!, null!);
+      const c: FormControl =
+          new FormControl({value: '', disabled: true, test: 'test'} as any, null!, null!);
       expect(c.value).toEqual({value: '', disabled: true, test: 'test'});
       expect(c.disabled).toBe(false);
     });
@@ -175,7 +175,7 @@ describe('FormControl', () => {
     });
 
     it('should support single validator from options obj', () => {
-      const c = new FormControl(null, {validators: Validators.required});
+      const c: FormControl = new FormControl(null, {validators: Validators.required});
       expect(c.valid).toEqual(false);
       expect(c.errors).toEqual({required: true});
 
@@ -184,7 +184,8 @@ describe('FormControl', () => {
     });
 
     it('should support multiple validators from options obj', () => {
-      const c = new FormControl(null, {validators: [Validators.required, Validators.minLength(3)]});
+      const c: FormControl =
+          new FormControl(null, {validators: [Validators.required, Validators.minLength(3)]});
       expect(c.valid).toEqual(false);
       expect(c.errors).toEqual({required: true});
 
@@ -212,7 +213,7 @@ describe('FormControl', () => {
     });
 
     it('should set single validator', () => {
-      const c = new FormControl(null);
+      const c: FormControl = new FormControl(null);
       expect(c.valid).toEqual(true);
 
       c.setValidators(Validators.required);
@@ -263,6 +264,16 @@ describe('FormControl', () => {
 
       c.setValue('a');
       expect(c.valid).toEqual(true);
+    });
+
+    it('should not mutate the validators array when overriding using setValidators', () => {
+      const control = new FormControl('');
+      const originalValidators = [Validators.required];
+
+      control.setValidators(originalValidators);
+      control.addValidators(Validators.minLength(10));
+
+      expect(originalValidators.length).toBe(1);
     });
 
     it('should override validators by setting `control.validator` field value', () => {
@@ -354,6 +365,30 @@ describe('FormControl', () => {
 
       c.removeValidators(Validators.required);
       expect(c.hasValidator(Validators.required)).toEqual(false);
+    });
+
+    it('should not mutate the validators array when adding/removing sync validators', () => {
+      const originalValidators = [Validators.required];
+      const control = new FormControl('', originalValidators);
+
+      control.addValidators(Validators.min(10));
+      expect(originalValidators.length).toBe(1);
+
+      control.removeValidators(Validators.required);
+      expect(originalValidators.length).toBe(1);
+    });
+
+    it('should not mutate the validators array when adding/removing async validators', () => {
+      const firstValidator = asyncValidator('one');
+      const secondValidator = asyncValidator('two');
+      const originalValidators = [firstValidator];
+      const control = new FormControl('', null, originalValidators);
+
+      control.addAsyncValidators(secondValidator);
+      expect(originalValidators.length).toBe(1);
+
+      control.removeAsyncValidators(firstValidator);
+      expect(originalValidators.length).toBe(1);
     });
 
     it('should return false when checking presence of a validator not identical by reference',
@@ -516,6 +551,16 @@ describe('FormControl', () => {
          tick();
          expect(c.valid).toEqual(true);
        }));
+
+    it('should not mutate the validators array when overriding using setValidators', () => {
+      const control = new FormControl('');
+      const originalValidators = [asyncValidator('one')];
+
+      control.setAsyncValidators(originalValidators);
+      control.addAsyncValidators(asyncValidator('two'));
+
+      expect(originalValidators.length).toBe(1);
+    });
 
     it('should override validators by setting `control.asyncValidator` field value',
        fakeAsync(() => {
@@ -815,6 +860,62 @@ describe('FormControl', () => {
       expect(c.value).toBe(null);
     });
 
+    it('should reset to the initial value if specified in FormControlOptions', () => {
+      const c2 = new FormControl('foo', {nonNullable: true});
+      expect(c2.value).toBe('foo');
+      expect(c2.defaultValue).toBe('foo');
+
+      c2.setValue('bar');
+      expect(c2.value).toBe('bar');
+      expect(c2.defaultValue).toBe('foo');
+
+      c2.reset();
+      expect(c2.value).toBe('foo');
+      expect(c2.defaultValue).toBe('foo');
+
+      const c3 = new FormControl('foo', {nonNullable: false});
+      expect(c3.value).toBe('foo');
+      expect(c3.defaultValue).toBe(null);
+
+      c3.setValue('bar');
+      expect(c3.value).toBe('bar');
+      expect(c3.defaultValue).toBe(null);
+
+      c3.reset();
+      expect(c3.value).toBe(null);
+      expect(c3.defaultValue).toBe(null);
+    });
+
+    it('should look inside FormState objects for a default value', () => {
+      const c2 = new FormControl({value: 'foo', disabled: false}, {initialValueIsDefault: true});
+      expect(c2.value).toBe('foo');
+      expect(c2.defaultValue).toBe('foo');
+
+      c2.setValue('bar');
+      expect(c2.value).toBe('bar');
+      expect(c2.defaultValue).toBe('foo');
+
+      c2.reset();
+      expect(c2.value).toBe('foo');
+      expect(c2.defaultValue).toBe('foo');
+    });
+
+    it('should not alter the disabled state when resetting, even if a default value is provided',
+       () => {
+         const c2 = new FormControl({value: 'foo', disabled: true}, {nonNullable: true});
+         expect(c2.value).toBe('foo');
+         expect(c2.defaultValue).toBe('foo');
+         expect(c2.disabled).toBe(true);
+
+         c2.setValue('bar');
+         c2.enable();
+
+         c2.reset();
+         expect(c2.value).toBe('foo');
+         expect(c2.defaultValue).toBe('foo');
+         expect(c2.disabled).toBe(false);
+       });
+
     it('should update the value of any parent controls with passed value', () => {
       const g = new FormGroup({'one': c});
       c.setValue('new value');
@@ -1004,7 +1105,7 @@ describe('FormControl', () => {
     it('should fire an event after the status has been updated to pending', fakeAsync(() => {
          const c = new FormControl('old', Validators.required, asyncValidator('expected'));
 
-         const log: any[] /** TODO #9100 */ = [];
+         const log: string[] = [];
          c.valueChanges.subscribe({next: (value: any) => log.push(`value: '${value}'`)});
 
          c.statusChanges.subscribe({next: (status: any) => log.push(`status: '${status}'`)});
@@ -1032,7 +1133,7 @@ describe('FormControl', () => {
 
     // TODO: remove the if statement after making observable delivery sync
     it('should update set errors and status before emitting an event', done => {
-      c.valueChanges.subscribe((value: any /** TODO #9100 */) => {
+      c.valueChanges.subscribe(() => {
         expect(c.valid).toEqual(false);
         expect(c.errors).toEqual({'required': true});
         done();
@@ -1406,11 +1507,15 @@ describe('FormControl', () => {
       });
 
       it('should throw when sync validator passed into async validator param', () => {
-        const fn = () => new FormControl('', syncValidator, syncValidator);
+        const fn = () =>
+            new FormControl('', syncValidator, syncValidator as unknown as AsyncValidatorFn);
         // test for the specific error since without the error check it would still throw an error
         // but
         // not a meaningful one
-        expect(fn).toThrowError(`Expected validator to return Promise or Observable.`);
+        expect(fn).toThrowError(
+            'NG01101: Expected async validator to return Promise or Observable. ' +
+            'Are you using a synchronous validator where an async validator is expected? ' +
+            'Find more at https://angular.io/errors/NG01101');
       });
 
       it('should not emit value change events when emitEvent = false', () => {
@@ -1467,6 +1572,57 @@ describe('FormControl', () => {
         c.markAsPending({emitEvent: false});
         expect(logger).toEqual([]);
       });
+    });
+  });
+
+  describe('can be extended', () => {
+    // We don't technically support extending Forms classes, but people do it anyway.
+    // We need to make sure that there is some way to extend them to avoid causing breakage.
+
+    class FCExt extends FormControl {
+      constructor(formState?: any|{
+        value?: any;
+        disabled?: boolean;
+      }, ...args: any) {
+        super(formState, ...args);
+      }
+    }
+
+    it('should perform basic FormControl operations', () => {
+      const nc = new FCExt({value: 'foo'});
+      nc.setValue('bar');
+      // There is no need to assert because, if this test compiles, then it is possible to correctly
+      // extend FormControl.
+    });
+  });
+
+  describe('inspecting the prototype still provides FormControl type', () => {
+    // The constructor should be a function with a prototype property of T.
+    // (This is the assumption we don't want to break.)
+    type Constructor<T> = Function&{prototype: T};
+
+    function isInstanceOf<T>(value: Constructor<T>, arg: unknown): arg is T {
+      // The implementation does not matter; we want to check whether this guard narrows the type.
+      return true;
+    }
+
+    // This is a nullable FormControl, and we want isInstanceOf to narrow the type.
+    const fcOrNull: FormControl|null = new FormControl(42);
+
+    it('and is appropriately narrowed', () => {
+      if (isInstanceOf(FormControl, fcOrNull)) {
+        // If the guard does not work, then this code will not compile due to null being in the
+        // type.
+        fcOrNull.setValue(7);
+      }
+    });
+  });
+
+  describe('Function.name', () => {
+    it('returns FormControl', () => {
+      // This is always true in the trivial case, but can be broken by various methods of overriding
+      // FormControl's exported constructor.
+      expect(FormControl.name).toBe('FormControl');
     });
   });
 });

@@ -8,6 +8,24 @@
 export interface BazelAndG3Options {
     annotateForClosureCompiler?: boolean;
     generateDeepReexports?: boolean;
+    onlyPublishPublicTypingsForNgModules?: boolean;
+}
+
+// @public
+export enum DiagnosticCategoryLabel {
+    Error = "error",
+    Suppress = "suppress",
+    Warning = "warning"
+}
+
+// @public
+export interface DiagnosticOptions {
+    extendedDiagnostics?: {
+        defaultCategory?: DiagnosticCategoryLabel;
+        checks?: {
+            [Name in ExtendedTemplateDiagnosticName]?: DiagnosticCategoryLabel;
+        };
+    };
 }
 
 // @public
@@ -26,6 +44,7 @@ export interface LegacyNgcOptions {
     allowEmptyCodegenFiles?: boolean;
     flatModuleId?: string;
     flatModuleOutFile?: string;
+    // @deprecated
     fullTemplateTypeCheck?: boolean;
     preserveWhitespaces?: boolean;
     strictInjectionParameters?: boolean;
@@ -39,7 +58,6 @@ export interface MiscOptions {
 
 // @public
 export interface NgcCompatibilityOptions {
-    enableIvy?: boolean | 'ngtsc';
     generateNgFactoryShims?: boolean;
     generateNgSummaryShims?: boolean;
 }
@@ -63,7 +81,6 @@ export interface StrictTemplateOptions {
 export interface TargetOptions {
     compilationMode?: 'full' | 'partial';
 }
-
 
 // (No @packageDocumentation comment for this package)
 

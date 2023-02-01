@@ -6,8 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {GeneratedFile, ParseSourceSpan, Position} from '@angular/compiler';
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {ExtendedTsCompilerHost, NgCompilerOptions} from '../ngtsc/core/api';
 
@@ -15,28 +14,8 @@ export const DEFAULT_ERROR_CODE = 100;
 export const UNKNOWN_ERROR_CODE = 500;
 export const SOURCE = 'angular' as 'angular';
 
-export interface DiagnosticMessageChain {
-  messageText: string;
-  position?: Position;
-  next?: DiagnosticMessageChain[];
-}
-
-export interface Diagnostic {
-  messageText: string;
-  span?: ParseSourceSpan;
-  position?: Position;
-  chain?: DiagnosticMessageChain;
-  category: ts.DiagnosticCategory;
-  code: number;
-  source: 'angular';
-}
-
 export function isTsDiagnostic(diagnostic: any): diagnostic is ts.Diagnostic {
   return diagnostic != null && diagnostic.source !== 'angular';
-}
-
-export function isNgDiagnostic(diagnostic: any): diagnostic is Diagnostic {
-  return diagnostic != null && diagnostic.source === 'angular';
 }
 
 export interface CompilerOptions extends NgCompilerOptions, ts.CompilerOptions {
@@ -139,12 +118,12 @@ export interface CompilerHost extends ts.CompilerHost, ExtendedTsCompilerHost {
    * E.g.
    * `some_file.ts` -> `some_file.d.ts`
    *
-   * @param referringSrcFileName the soure file that refers to fileName
+   * @param referringSrcFileName the source file that refers to fileName
    */
   toSummaryFileName?(fileName: string, referringSrcFileName: string): string;
   /**
    * Converts a fileName that was processed by `toSummaryFileName` back into a real fileName
-   * given the fileName of the library that is referrig to it.
+   * given the fileName of the library that is referring to it.
    */
   fromSummaryFileName?(fileName: string, referringLibFileName: string): string;
   /**
@@ -183,23 +162,26 @@ export interface TsEmitArguments {
   customTransformers?: ts.CustomTransformers;
 }
 
-export interface TsEmitCallback {
-  (args: TsEmitArguments): ts.EmitResult;
+export interface TsEmitCallback<T extends ts.EmitResult> {
+  (args: TsEmitArguments): T;
 }
-export interface TsMergeEmitResultsCallback {
-  (results: ts.EmitResult[]): ts.EmitResult;
-}
-
-export interface LibrarySummary {
-  fileName: string;
-  text: string;
-  sourceFile?: ts.SourceFile;
+export interface TsMergeEmitResultsCallback<T extends ts.EmitResult> {
+  (results: T[]): T;
 }
 
 export interface LazyRoute {
   route: string;
   module: {name: string, filePath: string};
   referencedModule: {name: string, filePath: string};
+}
+
+export interface EmitOptions<CbEmitRes extends ts.EmitResult> {
+  emitFlags?: EmitFlags;
+  forceEmit?: boolean;
+  cancellationToken?: ts.CancellationToken;
+  customTransformers?: CustomTransformers;
+  emitCallback?: TsEmitCallback<CbEmitRes>;
+  mergeEmitResultsCallback?: TsMergeEmitResultsCallback<CbEmitRes>;
 }
 
 export interface Program {
@@ -220,8 +202,7 @@ export interface Program {
   /**
    * Retrieve options diagnostics for the Angular options used to create the program.
    */
-  getNgOptionDiagnostics(cancellationToken?: ts.CancellationToken):
-      ReadonlyArray<ts.Diagnostic|Diagnostic>;
+  getNgOptionDiagnostics(cancellationToken?: ts.CancellationToken): ReadonlyArray<ts.Diagnostic>;
 
   /**
    * Retrieve the syntax diagnostics from TypeScript. This is faster than calling
@@ -242,7 +223,8 @@ export interface Program {
    *
    * Angular structural information is required to produce these diagnostics.
    */
-  getNgStructuralDiagnostics(cancellationToken?: ts.CancellationToken): ReadonlyArray<Diagnostic>;
+  getNgStructuralDiagnostics(cancellationToken?: ts.CancellationToken):
+      ReadonlyArray<ts.Diagnostic>;
 
   /**
    * Retrieve the semantic diagnostics from TypeScript. This is equivalent to calling
@@ -257,7 +239,7 @@ export interface Program {
    * Angular structural information is required to produce these diagnostics.
    */
   getNgSemanticDiagnostics(fileName?: string, cancellationToken?: ts.CancellationToken):
-      ReadonlyArray<ts.Diagnostic|Diagnostic>;
+      ReadonlyArray<ts.Diagnostic>;
 
   /**
    * Load Angular structural information asynchronously. If this method is not called then the
@@ -268,10 +250,7 @@ export interface Program {
   loadNgStructureAsync(): Promise<void>;
 
   /**
-   * Returns the lazy routes in the program.
-   * @param entryRoute A reference to an NgModule like `someModule#name`. If given,
-   *              will recursively analyze routes starting from this symbol only.
-   *              Otherwise will list all routes for all NgModules in the program/
+   * This method is obsolete and always returns an empty array.
    */
   listLazyRoutes(entryRoute?: string): LazyRoute[];
 
@@ -280,26 +259,7 @@ export interface Program {
    *
    * Angular structural information is required to emit files.
    */
-  emit({emitFlags, cancellationToken, customTransformers, emitCallback, mergeEmitResultsCallback}?:
-           {
-             emitFlags?: EmitFlags,
-             cancellationToken?: ts.CancellationToken,
-             customTransformers?: CustomTransformers,
-             emitCallback?: TsEmitCallback,
-             mergeEmitResultsCallback?: TsMergeEmitResultsCallback
-           }): ts.EmitResult;
-
-  /**
-   * Returns the .d.ts / .ngsummary.json / .ngfactory.d.ts files of libraries that have been emitted
-   * in this program or previous programs with paths that emulate the fact that these libraries
-   * have been compiled before with no outDir.
-   */
-  getLibrarySummaries(): Map<string, LibrarySummary>;
-
-  /**
-   * @internal
-   */
-  getEmittedGeneratedFiles(): Map<string, GeneratedFile>;
+  emit<CbEmitRes extends ts.EmitResult>(opts?: EmitOptions<CbEmitRes>|undefined): ts.EmitResult;
 
   /**
    * @internal

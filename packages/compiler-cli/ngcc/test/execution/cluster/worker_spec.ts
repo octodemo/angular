@@ -8,7 +8,7 @@
 
 /// <reference types="node" />
 
-import * as cluster from 'cluster';
+import cluster, {Worker} from 'cluster';
 import {EventEmitter} from 'events';
 
 import {AbsoluteFsPath} from '../../../../src/ngtsc/file_system';
@@ -55,7 +55,7 @@ describe('startWorker()', () => {
 
     beforeEach(() => {
       runAsClusterMaster(false);
-      mockClusterWorker(Object.assign(new EventEmitter(), {id: 42}) as cluster.Worker);
+      mockClusterWorker(Object.assign(new EventEmitter(), {id: 42}) as Worker);
     });
 
     it('should create the `compileFn()`', () => {
@@ -63,8 +63,18 @@ describe('startWorker()', () => {
       expect(createCompileFnSpy).toHaveBeenCalledWith(jasmine.any(Function), jasmine.any(Function));
     });
 
+    it('should notify the cluster master once ready', () => {
+      startWorker(mockLogger, createCompileFnSpy);
+
+      expect(processSendSpy).toHaveBeenCalledTimes(1);
+      expect(processSendSpy).toHaveBeenCalledWith({type: 'ready'}, jasmine.any(Function));
+    });
+
     it('should set up `compileFn()` to send `transformed-files` messages to master', () => {
       startWorker(mockLogger, createCompileFnSpy);
+
+      expect(processSendSpy).toHaveBeenCalledTimes(1);
+      expect(processSendSpy).toHaveBeenCalledWith({type: 'ready'}, jasmine.any(Function));
 
       const mockTransformedFiles: FileToWrite[] = [
         {path: '/foo' as AbsoluteFsPath, contents: 'FOO'},
@@ -75,7 +85,7 @@ describe('startWorker()', () => {
 
       beforeWritingFiles(mockTransformedFiles);
 
-      expect(processSendSpy).toHaveBeenCalledTimes(1);
+      expect(processSendSpy).toHaveBeenCalledTimes(2);
       expect(processSendSpy)
           .toHaveBeenCalledWith(
               {type: 'transformed-files', files: ['/foo', '/bar']}, jasmine.any(Function));
@@ -84,6 +94,9 @@ describe('startWorker()', () => {
     it('should set up `compileFn()` to send `task-completed` messages to master', () => {
       startWorker(mockLogger, createCompileFnSpy);
       const onTaskCompleted: TaskCompletedCallback = createCompileFnSpy.calls.argsFor(0)[1];
+
+      // Reset as we are not interested in the initial messages.
+      processSendSpy.calls.reset();
 
       onTaskCompleted(null as any, TaskProcessingOutcome.Processed, null);
       expect(processSendSpy).toHaveBeenCalledTimes(1);
@@ -128,10 +141,10 @@ describe('startWorker()', () => {
       } as unknown as Task;
 
       startWorker(mockLogger, createCompileFnSpy);
-      cluster.worker.emit('message', {type: 'process-task', task: mockTask});
+      cluster.worker!.emit('message', {type: 'process-task', task: mockTask});
 
       expect(compileFnSpy).toHaveBeenCalledWith(mockTask);
-      expect(processSendSpy).not.toHaveBeenCalled();
+      expect(processSendSpy).toHaveBeenCalledOnceWith({type: 'ready'}, jasmine.any(Function));
 
       expect(mockLogger.logs.debug[0]).toEqual([
         '[Worker #42] Processing task: {entryPoint: foo, formatProperty: es2015, processDts: Yes}',
@@ -153,12 +166,12 @@ describe('startWorker()', () => {
       startWorker(mockLogger, createCompileFnSpy);
 
       err = 'Error string.';
-      cluster.worker.emit('message', {type: 'process-task', task: mockTask});
+      cluster.worker!.emit('message', {type: 'process-task', task: mockTask});
       expect(processSendSpy)
           .toHaveBeenCalledWith({type: 'error', error: err}, jasmine.any(Function));
 
       err = new Error('Error object.');
-      cluster.worker.emit('message', {type: 'process-task', task: mockTask});
+      cluster.worker!.emit('message', {type: 'process-task', task: mockTask});
       expect(processSendSpy)
           .toHaveBeenCalledWith({type: 'error', error: err.stack}, jasmine.any(Function));
     });
@@ -185,11 +198,11 @@ describe('startWorker()', () => {
         compileFnSpy.and.throwError(noMemError);
 
         startWorker(mockLogger, createCompileFnSpy);
-        cluster.worker.emit('message', {type: 'process-task', task: mockTask});
+        cluster.worker!.emit('message', {type: 'process-task', task: mockTask});
 
         expect(mockLogger.logs.warn).toEqual([[`[Worker #42] ${noMemError.stack}`]]);
         expect(processExitSpy).toHaveBeenCalledWith(1);
-        expect(processSendSpy).not.toHaveBeenCalled();
+        expect(processSendSpy).toHaveBeenCalledOnceWith({type: 'ready'}, jasmine.any(Function));
       } finally {
         uninstallProcessExitSpies();
       }
@@ -197,7 +210,7 @@ describe('startWorker()', () => {
 
     it('should throw, when an unknown message type is received', () => {
       startWorker(mockLogger, createCompileFnSpy);
-      cluster.worker.emit('message', {type: 'unknown', foo: 'bar'});
+      cluster.worker!.emit('message', {type: 'unknown', foo: 'bar'});
 
       expect(compileFnSpy).not.toHaveBeenCalled();
       expect(processSendSpy)

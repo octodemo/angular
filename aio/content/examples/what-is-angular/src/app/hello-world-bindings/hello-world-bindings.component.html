@@ -1,10 +1,12 @@
 <!-- #docregion event-binding -->
 <button
+  type="button"
   [disabled]="canClick"
   (click)="sayMessage()">
   Trigger alert message
 </button>
 <!-- #enddocregion -->
+
 <!-- #docregion bindings -->
 <p
   [id]="sayHelloId"
@@ -12,4 +14,5 @@
   You can set my color in the component!
 </p>
 <!-- #enddocregion -->
+
 <p>My color is {{ fontColor }}</p>

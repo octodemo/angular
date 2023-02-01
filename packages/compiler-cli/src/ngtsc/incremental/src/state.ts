@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {AbsoluteFsPath} from '../../file_system';
 import {ClassRecord} from '../../transform';
@@ -80,7 +80,7 @@ export interface AnalyzedIncrementalState {
  * Incremental state for a compilation that has not been successfully analyzed, but that can be
  * based on a previous compilation which was.
  *
- * This is the state produced by an incremeental compilation until its own analysis succeeds. If
+ * This is the state produced by an incremental compilation until its own analysis succeeds. If
  * analysis fails, this state carries forward information about which files have changed since the
  * last successful build (the `lastAnalyzedState`), so that the next incremental build can consider
  * the total delta between the `lastAnalyzedState` and the current program in its incremental

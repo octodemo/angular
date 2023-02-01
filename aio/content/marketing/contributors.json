@@ -23,13 +23,6 @@
     "bio": "Muhammad Ahsan Ayaz is Software Architect at Modus Create. He is absolutely passionate about Angular and Web Technologies. Uses Angular daily and talks about it everywhere. Runs NodeSchool Karachi and is a co-organizer of NgPakistan",
     "groups": ["GDE"]
   },
-  "aikidave": {
-    "name": "Dave Shevitz",
-    "picture": "daveshevitz.jpg",
-    "bio": "Dave is a technical writer focused on creating a great documentation experience for Angular developers. When he isn't writing, he's toying with new technologies. His favorite motto is: 'What could possibly go wrong?'",
-    "groups": ["Angular"],
-    "lead": "igorminar"
-  },
   "ajitsinghkaler": {
     "name": "Ajit Singh",
     "groups": ["Collaborators"],
@@ -42,7 +35,7 @@
     "groups": ["Angular"],
     "lead": "dgp1130",
     "picture": "alan-agius4.jpg",
-    "bio": "Angular CLI Member, Loves TypeScript, Build Tools, Food, Beer & Coffee :)"
+    "bio": "Angular CLI Member, Loves TypeScript, Build Tools, Food, Beer & Coffee :)"
   },
   "alisaduncan": {
     "name": "Alisa Duncan",
@@ -92,6 +85,37 @@
     "groups": ["Angular"],
     "lead": "jelbourn"
   },
+  "anfibiacreativa": {
+    "name": "Natalia Venditto",
+    "picture": "natalia_venditto.jpg",
+    "twitter": "anfibiacreativa",
+    "website": "https://github.com/anfibiacreativa",
+    "bio": "Natalia started working professionally as a web software developer in the early 2000s. She now works in the role of technical lead and software/solutions architect. She is a public speaker, content creator, GDE for Angular and Web Technologies, Microsoft MVP Award (Developer Technologies), and a mentor with the RoadtoGDE program.",
+    "groups": ["GDE"]
+  },
+  "AnkitSharma-007": {
+    "name": "Ankit Sharma",
+    "picture": "ankit-sharma.jpg",
+    "twitter": "ankitsharma_007",
+    "website": "https://ankitsharmablogs.com",
+    "bio": "SDE III @cisco | GDE for Angular | Microsoft MVP | Author | Speaker | Passionate Programmer",
+    "groups": ["GDE"]
+  },
+  "antoniocardenas": {
+    "name": "Antonio Cardenas",
+    "picture": "antonio-cardenas.jpg",
+    "twitter": "yeoudev",
+    "website": "https://yeou.dev",
+    "bio": "Antonio is a senior Angular developer from Honduras, focus on immersive experiences and Web Performance, He is a public Speaker, Mentor and Facilitator for entrepreneurship programs as Techstars Startup Weekend, Content Creator and tech writer Cofounder of non profit organization @Macaotech, Love to share knowledge Typescript Coffe and Cats 🐱.",
+    "groups": ["GDE"]
+  },
+  "armenvardanyan95": {
+    "name": "Armen Vardanyan",
+    "picture": "armen-vardanyan.jpg",
+    "groups": ["GDE"],
+    "twitter": "armandotrue",
+    "bio": "Armen is a senior Angular developer from Armenia, tech writer, speaker, mentor and a Google Developer Expert for Angular."
+  },
   "atscott": {
     "name": "Andrew Scott",
     "picture": "andrewscott.jpg",
@@ -106,12 +130,20 @@
     "website": "https://github.com/ayazhafiz",
     "bio": "Ayaz is an undergraduate student with interests in free software."
   },
+  "balramchavan": {
+    "name": "Balram Chavan",
+    "picture": "balram_chavan.jpg",
+    "twitter": "uvbrain",
+    "website": "https://balramchavan.com",
+    "bio": "Balram is a Google Developer Expert in Angular. He enjoys building complex web applications and cloud solutions. He is the author of the book Object Oriented Programming with Angular. He loves to write technical blogs mostly about Angular.",
+    "groups": ["GDE"]
+  },
   "bampakoa": {
     "name": "Aristeidis Bampakos",
     "picture": "aristeidis.jpg",
     "twitter": "abampakos",
     "website": "https://medium.com/@abampakos",
-    "bio": "Aristeidis is a web development team lead at Plex-Earth working with Angular. He is a co-organizer of the Angular Athens meetup and the author of Learning Angular - 3rd Edition and Angular Projects - 2nd Edition books. He is also a senior Angular instructor at Code.Hub where he teaches the Angular framework to other developers.",
+    "bio": "Aristeidis is a web development team lead at Plex-Earth working with Angular. He is the author of two books about Angular: Learning Angular - 3rd Edition and Angular Projects - 2nd Edition. He also works as an Angular senior tech instructor at Code.Hub where he teaches the Angular framework to other developers and professionals.",
     "groups": ["GDE"]
   },
   "bbrennan": {
@@ -121,12 +153,37 @@
     "picture": "bonnie.jpg",
     "bio": "Bonnie has been specializing in Angular since 2013. She is the founder of ngHouston Angular Meetup and a regular panelist on Angular Air. She is also the very proud parent component of @thelittlestdev!"
   },
+  "bezael": {
+    "name": "Bezael Perez",
+    "picture": "bezael_perez.jpg",
+    "twitter": "bezaelperez",
+    "website": "https://medium.com/@bezael",
+    "bio": "Bezael is an Angular Developer and a GDE. He is a technical content creator on Youtube and Udemy. He has spoken at over 50 conferences internationally. He enjoys gaming, basketball, and soccer",
+    "groups": ["GDE"]
+  },
   "blove": {
     "name": "Brian Love",
     "picture": "brian-love.jpg",
     "twitter": "brian_love",
     "website": "https://brianflove.com",
     "bio": "Brian is a software engineer and GDE in Angular with a passion for learning, writing, speaking, teaching and mentoring. Brian has been building web applications for over 20 years and has long been a fanboy of JavaScript. When not in front of his Macbook Pro Brian is in the Rocky Mountains skiing or hiking.",
+    "groups": ["GDE"]
+  },
+  "bobwatson": {
+    "name": "Bob Watson",
+    "lead": "mgechev",
+    "picture": "bob-watson.jpg",
+    "twitter": "bobwatsonphd",
+    "website": "https://docsbydesign.com",
+    "bio": "Bob is the documentation lead for angular.io. When he's not obsessing over the i-dotting and t-crossing of documentation, he enjoys seeing the world from up in the air and below the sea.",
+    "groups": ["Angular"]
+  },
+  "bravery08": {
+    "name": "Brooke Avery",
+    "picture": "bravery_pic.png",
+    "twitter": "JediBravery",
+    "website": "https://devlife.show",
+    "bio": "Brooke is a software engineer, GDE, & community builder. She is the director of the Angular Community Meetup, a co-producer/host of the Dev.Life Podcast, & has been a co-organizer for ng-conf. Brooke has a strong passion for education & helping others find success in their developer journeys. Outside of programming, Brooke loves to geek out on Star Wars and the Disney Parks.",
     "groups": ["GDE"]
   },
   "brocco": {
@@ -152,7 +209,6 @@
   },
   "cexbrayat": {
     "name": "Cédric Exbrayat",
-    "mentor": "petebacondarwin",
     "groups": ["Collaborators"],
     "picture": "cexbrayat.jpg",
     "bio": "Author of `Become a ninja with Angular (2+)` https://books.ninja-squad.com/angular - Angular trainer and @Ninja-Squad co-founder"
@@ -210,18 +266,20 @@
     "groups": ["Angular"],
     "lead": "jelbourn"
   },
-  "danieltre23": {
-    "name": "Daniel Trevino",
-    "picture": "danieltre23.jpg",
-    "bio": "Daniel is a Software Engineer Intern at Google, loves to learn new things, write code and listen to music.",
-    "groups": ["Angular"]
-  },
   "danwahlin": {
     "name": "Dan Wahlin",
     "picture": "danwahlin.jpg",
     "twitter": "DanWahlin",
     "website": "https://codewithdan.com",
     "bio": "Dan Wahlin founded Wahlin Consulting which provides consulting and onsite/online training services on Web technologies such as JavaScript, Angular, TypeScript, Node.js, C#, ASP.NET Core, Web API, and Docker. He’s also published many developer courses on Pluralsight.com and Udemy.com. Dan is a Google GDE, Docker Captain, and Microsoft MVP and Regional Director and speaks at conferences and user groups around the world.  Dan has written several books on Web technologies, hundreds of technical articles and blog posts (https://blog.codewithdan.com) and runs the 'Code with Dan Web Weekly Newsletter' - a great way to stay up on the latest technologies. Follow Dan on Twitter @DanWahlin.",
+    "groups": ["GDE"]
+  },
+  "danywalls": {
+    "name": "Dany Paredes",
+    "picture": "danyparedes.jpg",
+    "twitter": "danywalls",
+    "website": "https://www.danywalls.com",
+    "bio": "Dany is a Google Developer Expert on Angular and loves sharing content and writing articles about Angular, Typescript, and Testing. In his spare time, he watches NBA games and enjoys the Beach.",
     "groups": ["GDE"]
   },
   "deborah": {
@@ -256,6 +314,14 @@
     "website": "https://github.com/dgp1130",
     "bio": "Doug is an overly-opinionated software developer with a passion for making awesome developer tools. He is motivated primarily by his selfish desire to make his own life easier, but loves to share his tools and workflows with others to make everyone's lives easier.",
     "groups": ["Angular"]
+  },
+  "dmezhenskyi": {
+    "name": "Dmytro Mezhenskyi",
+    "picture": "dmytro-mezhenskyi.jpg",
+    "bio": "Dmytro is a self-taught Frontend Developer, originally from Ukraine and currently living in Vienna, Austria. He is also a content creator and author of a YouTube channel \"Decoded Frontend\".",
+    "groups": ["GDE"],
+    "twitter": "DecodedFrontend",
+    "website": "https://youtube.com/DecodedFrontend"
   },
   "doguhan": {
     "name": "Doguhan Uluca",
@@ -310,6 +376,14 @@
     "bio": "Fabian Gosebrink is a Google Developer Expert for Angular and Web Technologies, Microsoft MVP and Web Developer for ASP.NET Core and Angular. As a professional software engineer, consultant and trainer, he advises and supports customers in the implementation of frontend, backend, and mobile development of web applications.",
     "groups": ["GDE"]
   },
+  "famzil": {
+    "name": "Fatima AMZIL",
+    "picture": "famzil.jpg",
+    "twitter": "fati_amzil",
+    "website": "https://fatimaamzil.com",
+    "bio": "Frontend software engineer and Google Developer Expert for Angular",
+    "groups": ["GDE"]
+  },
   "filipesilva": {
     "name": "Filipe Silva",
     "picture": "filipe-silva.jpg",
@@ -341,21 +415,7 @@
     "website": "https://github.com/gkalpak",
     "bio": "George is a Software Engineer with a passion for chess, robotics and automating stuff. He has a strong need to know how things work (so if you already know, he'd love to have a talk with you). He has been a member of the AngularJS team since 2014. When not doing geeky stuff, he is probably trying to convince his wife and kids to apply programming principles in real life. (Or is it the other way around?)",
     "groups": ["Angular"],
-    "lead": "igorminar"
-  },
-  "gregmagolan": {
-    "name": "Greg Magolan",
-    "groups": ["Angular"],
-    "lead": "dgp1130",
-    "picture": "gregmagolan.jpg",
-    "bio": "Building great software with Angular and Node.js."
-  },
-  "igorminar": {
-    "name": "Igor Minar",
-    "picture": "igor-minar.jpg",
-    "twitter": "IgorMinar",
-    "bio": "Igor is a software engineer at Google. He is a lead on the Angular project, practitioner of test driven development, open source enthusiast, hacker. In his free time, Igor enjoys spending time with his wife and two kids, doing outdoor activities (including but not limited to sports, gardening and building retaining walls).",
-    "groups": ["Angular"]
+    "lead": "jelbourn"
   },
   "jbedard": {
     "name": "Jason Bedard",
@@ -385,8 +445,7 @@
     "twitter": "jelbourn",
     "website": "https://plus.google.com/+JeremyElbourn/",
     "bio": "Angular Material Team Lead. FE Engineer @ Google specializing in AngularJS, component design, and the cleanest of code.",
-    "groups": ["Angular"],
-    "lead": "igorminar"
+    "groups": ["Angular"]
   },
   "jeremywilken": {
     "name": "Jeremy Wilken",
@@ -407,7 +466,7 @@
   "jiali": {
     "name": "Jia Li",
     "groups": ["Collaborators"],
-    "mentor": "igorminar",
+    "mentor": "jelbourn",
     "picture": "JiaLiPassion.jpg",
     "twitter": "Jialipassion",
     "website": "https://github.com/JiaLiPassion",
@@ -436,6 +495,14 @@
     "twitter": "devjoost",
     "bio": "Joost is a Software Engineer from the Netherlands with an interest in open source software who likes to learn something new every day. He works at Blueriq during the day and contributes to Angular in his spare time, by working on the Angular compiler and runtime. He may review your PR even if you never asked for it ;)"
   },
+  "jordanpowell88": {
+    "name": "Jordan Powell",
+    "picture": "jordanpowell.jpg",
+    "twitter": "jordanpowell88",
+    "website": "https://jordanpowell88.com",
+    "bio": "Jordan is a GDE (Google Developer Expert) and a self taught software engineer who is passionate about writing 'good code' that is easy to read, test and maintain over time. He has over a decade of freelance experience in software development, marketing, design and video production. He currently is a Developer Experience Engineer at Cypress.io and also serves as the CEO & Co-Founder for the non-profit Dream On: Global.",
+    "groups": ["GDE"]
+  },
   "jorgeucano": {
     "name": "Jorge Cano",
     "picture": "jorgeucano.jpg",
@@ -448,15 +515,22 @@
     "name": "Joey Perrott",
     "picture": "josephperrott.jpeg",
     "twitter": "joeyperrott",
-    "groups": ["Angular"],
-    "lead": "igorminar"
+    "groups": ["Angular"]
+  },
+  "joshuamorony": {
+    "name": "Joshua Morony",
+    "picture": "joshuamorony.jpg",
+    "twitter": "joshuamorony",
+    "website": "https://joshmorony.com",
+    "bio": "Josh is a Software Engineer, Google Developer Expert for Angular, and Ionic Developer Expert. He is a consultant and content creator focused on advancing the skills of Angular and Ionic developers. He is the author of multiple books and courses including Ionic Start and Modern Angular.",
+    "groups": ["GDE"]
   },
   "josmar-crwdstffng": {
     "name": "Joe Martin",
     "picture": "josephmmartin.jpg",
     "bio": "Joe is a technical writer working on the Angular docs.",
     "groups": ["Angular"],
-    "lead": "aikidave"
+    "lead": "mgechev"
   },
   "jschwarty": {
     "name": "Justin Schwartzenberger",
@@ -495,6 +569,14 @@
     "picture": "keilla.jpg",
     "twitter": "keillamenezes_",
     "bio": "I am Senior Software Development Consultant in ThoughtWorks and GDE in Angular. Graduated in Computer Science from Federal University of Bahia, I have been worked with software development for more than 11 years. Since 2017, I started with Angular Framework and I went deep into front-end ecosystem and became more specialized in this area. I participate in a computer science community, Campinas Front-end, that promotes events in this area. In the end of 2016, I started to do technical talks. The passion for science is the engine that drives me to seek answers to the problems that computing aims to solve. Besides that, sharing knowledge and experiences is the path I choose to democratize the technology for all.",
+    "groups": ["GDE"]
+  },
+  "kevindavila": {
+    "name": "Kevin Davila",
+    "picture": "kevindavila.jpg",
+    "twitter": "kevindaviladev",
+    "website": "https://github.com/kevindaviladev",
+    "bio": "Kevin is a Google Developer Expert with a passion for web development. Share content and knowledge with everyone and be ready to learn as much as possible. Lover of Angular, Postgresql and frogs.",
     "groups": ["GDE"]
   },
   "kevinyang": {
@@ -560,6 +642,16 @@
     "groups": ["Angular"],
     "mentor": "jelbourn"
   },
+  "MainaWycliffe": {
+    "name": "Maina Wycliffe",
+    "picture": "MainaWycliffe.jpg",
+    "twitter": "mwycliffe_dev",
+    "website": "https://mainawycliffe.dev/",
+    "bio": "Wycliffe is a Software Engineer from Kenya passionate about Teaching, Speaking, Writing, Open Source, and Mentorship. On top of that, he is passionate about Typescript and loves teaching developers how to get the most out of it.",
+    "groups": [
+      "GDE"
+    ]
+  },
   "manekinekko": {
     "name": "Wassim Chegham",
     "picture": "wassim.jpg",
@@ -577,6 +669,22 @@
     "bio": "Trainer and Consultant with focus on Angular. Writes for O'Reilly, the German Java Magazine and Heise. Regularly speaks at conferences.",
     "mentor": "mgechev",
     "groups": ["GDE", "Collaborators"]
+  },
+  "mariakorneeva": {
+    "name": "Maria Korneeva",
+    "picture": "korneeva.jpg",
+    "twitter": "BrowserPerson",
+    "website": "https://www.linkedin.com/in/maria-korneeva/",
+    "bio": "Maria is a trainer and consultant with focus on Angular. She writes for ng-conf and speaks at tech meetups and conferences. In her tweets and articles Maria likes to share her learnings from everyday coding. Fun fact: she illustrates her stories herself because she likes drawing.",
+    "groups": ["GDE"]
+  },
+  "markostanimirovic": {
+    "name": "Marko Stanimirović",
+    "picture": "marko.jpg",
+    "twitter": "MarkoStDev",
+    "website": "https://github.com/markostanimirovic",
+    "bio": "Marko is a core member of the NgRx team, a Google Developer Expert in Angular, and an organizer of the Angular Belgrade group. He enjoys contributing to open source software, sharing knowledge through technical articles and talks, and playing guitar. He is also a Master of Science in Software Engineering from the University of Belgrade.",
+    "groups": ["GDE"]
   },
   "marsibarsi": {
     "name": "Roman Sedov",
@@ -665,6 +773,14 @@
     "bio": "Chau works to bring the best engineering practices to web application production. He is the creator of AutoMapper TypeScript, @ngneat/tailwind for Angular, and a core member of NestJS. Also, he is one of Angular Vietnam’s founders. He blogs, lives stream, and maintains open-source projects.",
     "groups": ["GDE"]
   },
+  "nicobytes": {
+    "name": "Nicolas Molina",
+    "picture": "nicobytes.jpg",
+    "twitter": "nicobytes",
+    "website": "https://nicobytes.com",
+    "bio": "I'm Software Senior Developer. With more than 8 years of professional software development experience focusing in Web Development, Tech Management and skills for problem-solving. I'm passionate about sharing my knowledge with the community about Web Development and I do this through code contributions, videos, conferences, articles and, creating online content therefore I got recognized by Google like an GDE (Google Developer Expert) in Angular and by Microsoft like an MVP (Most Value Professional).",
+    "groups": ["GDE"]
+  },
   "nirkaufman": {
     "name": "Nir Kaufman",
     "picture": "nirkaufman.jpg",
@@ -686,15 +802,6 @@
     "website": "https://twitter.com/PascalPrecht",
     "bio": "Pascal is a software engineer, author and Google Developer Expert for the Angular team. He loves contributing to open source and is the creator of the popular angular-translate module. In his spare time he’s fiddling with EDM production.",
     "groups": ["GDE"]
-  },
-  "petebacondarwin": {
-    "name": "Pete Bacon Darwin",
-    "picture": "pete.jpg",
-    "twitter": "petebd",
-    "website": "https://www.bacondarwin.com/",
-    "bio": "AngularJS for JS Team Lead. Pete has been working on the core team since 2012 and became the team lead for the AngularJS for JS branch in November 2014. He has co-authored a book on AngularJS and regularly talks about and teaches Angular.",
-    "groups": ["Angular"],
-    "lead": "igorminar"
   },
   "phenomnomnominal": {
     "name": "Craig Spence",
@@ -720,11 +827,27 @@
     "bio": "Preston is a JavaScript developer, husband, and father of four from Roy, UT. He also writes blog posts, creates training courses for Thinkster.io, and loves learning more about web development. In his free time he likes to spend time with his family and play or watch basketball (Go Jazz!). ",
     "groups": ["GDE"]
   },
+  "profanis": {
+    "name": "Fanis Prodromou",
+    "picture": "profanis.jpg",
+    "twitter": "prodromouf",
+    "website": "https://blog.profanis.me",
+    "bio": "Fanis is a Full Stack JavaScript developer, Angular GDE, speaker at meetups, author of the book 'Mastering Angular Reactive Forms', and he constantly creates videos in his YouTube channel to share his knowledge with others. He also teaches Angular in Code.Hub institute and mentors other developers. When he is not behind a keyboard, he spends time with his lovely daughter and enjoys family time with his wife.",
+    "groups": ["GDE"]
+  },
   "ralph": {
     "name": "Ralph Wang",
     "picture": "ralph.jpg",
     "twitter": "ralph_wang_gde",
     "bio": "Ralph(Zhicheng Wang) is a senior consultant at ThoughtWorks and also a GDE. He is a technology enthusiast and he is a passionate advocate of 'Simplicity, Professionalism and Sharing'. In his eighteen years of R&D career, he worked as tester, R&D engineer, project manager, product manager and CTO. He is immersed in the excitement of the arrival of the baby.",
+    "groups": ["GDE"]
+  },
+  "ricardochavarria": {
+    "name": "Ricardo Chavarria",
+    "picture": "ricardo-chavarria.jpg",
+    "twitter": "ricardo_chl",
+    "website": "https://ricardochavarria.dev",
+    "bio": "Ricardo Chavarria is a software developer with focus in frontend technologies. Organizer of Angular Honduras Community and Ng Conf Honduras. Also is Google Developer Expert in Angular and Auth0 ambassador.",
     "groups": ["GDE"]
   },
   "sajee": {
@@ -741,8 +864,7 @@
     "twitter": "samjulien",
     "website": "https://www.samjulien.com/",
     "bio": "Sam Julien builds software, articles, video courses, and campfires. A developer, speaker, writer, and GDE in the Pacific Northwest, Sam's favorite thing in the world is changing someone's life by teaching them to code.",
-    "groups": ["Collaborators",
-      "GDE"],
+    "groups": ["Collaborators", "GDE"],
     "mentor": "gkalpak"
   },
   "samvloeberghs": {
@@ -768,6 +890,14 @@
     "bio": "Santosh is a GDE for Angular and loves to contribute to Open Source. He is the creator of ng deploy for netlify and core team member for NestJS Addons. He writes for AngularInDepth, mentors for DotNetTricks, organizes Pune Tech Meetup, and conducts free workshops on Angular.",
     "groups": ["GDE"]
   },
+  "selintunc": {
+      "name": "Selin Tunc",
+      "picture": "selin.jpeg",
+      "twitter": "selintunc_",
+      "website": "https://www.linkedin.com/in/selinkaragulletunc",
+      "bio": "Selin is a Software Developer Expert using Angular and Java at Garanti BBVA Technology in Turkey. She is the first woman Angular GDE in Turkey. She spends her spare time with her family, especially her little son, and by keeping herself up-to-date.",
+      "groups": ["GDE"]
+  },
   "shairez": {
     "name": "Shai Reznik",
     "picture": "shaireznik.jpg",
@@ -790,6 +920,15 @@
     "twitter": "SiddAjmera",
     "bio": "Siddharth is a Full Stack JavaScript Developer and a GDE in Angular. He's passionate about sharing his knowledge on Angular, Firebase and the Web in general. He's the organizer of WebStack, a local community of developers focused on Web, Mobile, Voice and Server related technologies in general. WebStack hosts free monthly meetups every 2nd or 3rd Saturday of the month. Siddharth is also an avid photographer and loves traveling. Find him anywhere on the Web with `SiddAjmera`.",
     "groups": ["GDE"]
+  },
+	"simonaco": {
+    "name": "Simona Cotin",
+    "picture": "simonacotin.jpg",
+    "twitter": "simona_cotin",
+    "website": "https://github.com/simonaco",
+    "bio": "Engineering manager working on Angular Framework and Tooling",
+    "groups": ["Angular"],
+    "lead": "madleinas"
   },
   "simpulton": {
     "name": "Lukas Ruebbelke",
@@ -834,7 +973,7 @@
     "picture": "teriglover.png",
     "bio": "Teri is a technical editor working on the Angular docs team.",
     "groups": ["Angular"],
-    "lead": "aikidave"
+    "lead": "mgechev"
   },
   "thekiba": {
     "name": "Andrew Grekov",
@@ -843,12 +982,6 @@
     "website": "https://thekiba.io",
     "bio": "Andrew is a software engineer using Angular and .NET. He spends most of his spare time staying up-to-date, helping other people, and experimenting with web tech.",
     "groups": ["GDE"]
-  },
-  "tmdavisgoogle": {
-    "name": "Tiffany Davis",
-    "bio": "Tiffany is an editor working on Angular documentation.",
-    "groups": ["Angular"],
-    "lead": "aikidave"
   },
   "toddmotto": {
     "name": "Todd Motto",
@@ -944,6 +1077,30 @@
     "twitter": "willmendesneto",
     "website": "https://willmendesneto.github.io",
     "bio": "GDE (Google Developer Expert) Angular and Web Technologies, GDG Salvador organizer, passionate about technology and active in communities with a focus on web development, including Angular, JavaScript, HTML5, CSS3, Workflow, web performance, security and Internet of things. Participates in events organization, speaker at conferences in Brazil and other countries and contributes to several open source projects.",
+    "groups": ["GDE"]
+  },
+  "yannickbaron": {
+    "name": "Yannick Baron",
+    "picture": "yannickbaron.jpg",
+    "twitter": "yannick_baron",
+    "website": "https://thinktecture.com",
+    "bio": "Yannick is an Angular GDE (Google Developer Expert) and a consultant at Thinktecture in Germany. He has a passion for RxJS and reactive programming, and loves to help others improve their understanding of development with TypeScript and Angular. In his spare time, Yannick enjoys staying up-to-date with the latest trends and techniques in the world of web development. In addition to his work as a consultant, Yannick is also an active blogger and frequently speaks at conferences and meetups about topics related to Angular, RxJS, and reactive state management.",
+    "groups": ["GDE"]
+  },
+  "yharaskrik": {
+    "name": "Jay Bell",
+    "picture": "jaybell.jpg",
+    "twitter": "jaycooperbell",
+    "website": "tech.trellis.org",
+    "bio": "Jay is the CTO and Co-Founder of a Social Enterprise in Canada that is using Angular and technology to empower global collective impact in the non-profit and charity industries. He is an avid contributor to Nx and loves Angular, NgRx and Nest. Jay loves to share knowledge he has learned from figuring out problems (complex or otherwise) so that others can solve them easier the next time.",
+    "groups": ["GDE"]
+  },
+  "yjaaidi": {
+    "name": "Younes Jaaidi",
+    "picture": "younes.jpg",
+    "twitter": "yjaaidi",
+    "website": "https://marmicode.io",
+    "bio": "Younes is a software cook, trainer, and coach who loves the challenge of boosting teams' efficiency and helping everyone enjoy every part of their job. His experience convinced him that the key to making quality products is collective ownership, passion, and knowledge sharing. In his spare time, you will find him contributing to open-source software, writing articles or speaking at meetups or conferences… and sometimes sailing. His favorite trick? Adding features by removing code. He is also the co-creator of the JSCutlery open-source community.",
     "groups": ["GDE"]
   },
   "yurzui": {

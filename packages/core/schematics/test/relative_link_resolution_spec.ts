@@ -10,28 +10,39 @@ import {getSystemPath, normalize, virtualFs} from '@angular-devkit/core';
 import {TempScopedNodeJsSyncHost} from '@angular-devkit/core/node/testing';
 import {HostTree} from '@angular-devkit/schematics';
 import {SchematicTestRunner, UnitTestTree} from '@angular-devkit/schematics/testing';
-import * as shx from 'shelljs';
+import {runfiles} from '@bazel/runfiles';
+import shx from 'shelljs';
 
-describe('initial navigation migration', () => {
+describe('Relative link resolution config migration', () => {
   let runner: SchematicTestRunner;
   let host: TempScopedNodeJsSyncHost;
   let tree: UnitTestTree;
   let tmpDirPath: string;
   let previousWorkingDir: string;
 
+  function writeFile(filePath: string, contents: string) {
+    host.sync.write(normalize(filePath), virtualFs.stringToFileBuffer(contents));
+  }
+
+  function runMigration() {
+    return runner.runSchematic('migration-v15-relative-link-resolution', {}, tree);
+  }
+
   beforeEach(() => {
-    runner = new SchematicTestRunner('test', require.resolve('../migrations.json'));
+    runner = new SchematicTestRunner('test', runfiles.resolvePackageRelative('../migrations.json'));
     host = new TempScopedNodeJsSyncHost();
     tree = new UnitTestTree(new HostTree(host));
 
     writeFile('/tsconfig.json', JSON.stringify({
       compilerOptions: {
         lib: ['es2015'],
-      }
+        strictNullChecks: true,
+      },
     }));
+
     writeFile('/angular.json', JSON.stringify({
       version: 1,
-      projects: {t: {architect: {build: {options: {tsConfig: './tsconfig.json'}}}}}
+      projects: {t: {root: '', architect: {build: {options: {tsConfig: './tsconfig.json'}}}}}
     }));
 
     previousWorkingDir = shx.pwd();
@@ -47,143 +58,73 @@ describe('initial navigation migration', () => {
     shx.rm('-r', tmpDirPath);
   });
 
-  it('should migrate forRoot with no options', async () => {
+  it('should drop `relativeLinkResolution` config option when used with RouterModule.forRoot',
+     async () => {
+       writeFile('/index.ts', `
+          import { RouterModule } from '@angular/router';
+
+          let providers = RouterModule.forRoot([], {
+            onSameUrlNavigation: 'reload',
+            paramsInheritanceStrategy: 'always',
+            relativeLinkResolution: 'legacy',
+            enableTracing: false,
+          });
+
+          providers = RouterModule.forRoot([], {
+            onSameUrlNavigation: 'reload',
+            paramsInheritanceStrategy: 'always',
+            relativeLinkResolution: 'corrected',
+            enableTracing: false,
+          });
+        `);
+
+       await runMigration();
+
+       const content = tree.readContent('/index.ts');
+       expect(content).not.toContain('relativeLinkResolution');
+     });
+
+  it('should drop `relativeLinkResolution` config option when used without RouterModule.forRoot',
+     async () => {
+       writeFile('/index.ts', `
+          const routerConfig = {
+            onSameUrlNavigation: 'reload',
+            paramsInheritanceStrategy: 'always',
+            relativeLinkResolution: 'legacy',
+            enableTracing: false,
+          };
+        `);
+
+       await runMigration();
+
+       const content = tree.readContent('/index.ts');
+       expect(content).not.toContain('relativeLinkResolution');
+     });
+
+  it('should not touch `` if a value is unknown', async () => {
     writeFile('/index.ts', `
-        import { NgModule } from '@angular/core';
-        import { RouterModule } from '@angular/router';
-        @NgModule({
-          imports: [
-            RouterModule.forRoot([]),
-          ]
-        })
-        export class AppModule {
-        }
-      `);
+      const routerConfig = {
+        relativeLinkResolution: 'some-unknown-value',
+      };
+    `);
 
     await runMigration();
-    expect(tree.readContent('/index.ts'))
-        .toContain(`RouterModule.forRoot([], { relativeLinkResolution: 'legacy' })`);
+
+    const content = tree.readContent('/index.ts');
+    expect(content).toContain(`relativeLinkResolution: 'some-unknown-value'`);
   });
 
-  it('should migrate options without relativeLinkResolution', async () => {
-    writeFile('/index.ts', `
-        import { NgModule } from '@angular/core';
-        import { RouterModule } from '@angular/router';
-        @NgModule({
-          imports: [
-            RouterModule.forRoot([], {useHash: true}),
-          ]
-        })
-        export class AppModule {
-        }
-      `);
+  it('should retain an empty object if `relativeLinkResolution` was the only property',
+     async () => {
+       writeFile('/index.ts', `
+          const routerConfig = {
+            relativeLinkResolution: 'legacy',
+          };
+        `);
 
-    await runMigration();
-    expect(tree.readContent('/index.ts'))
-        .toContain(`RouterModule.forRoot([], { useHash: true, relativeLinkResolution: 'legacy' })`);
-  });
+       await runMigration();
 
-  it('should not migrate options containing relativeLinkResolution', async () => {
-    writeFile('/index.ts', `
-        import { NgModule } from '@angular/core';
-        import { RouterModule } from '@angular/router';
-        @NgModule({
-          imports: [
-            RouterModule.forRoot([], {relativeLinkResolution: 'corrected'}),
-          ]
-        })
-        export class AppModule {
-        }
-      `);
-
-    await runMigration();
-    expect(tree.readContent('/index.ts'))
-        .toContain(`RouterModule.forRoot([], {relativeLinkResolution: 'corrected'})`);
-  });
-
-  it('should migrate when options is a variable with AsExpression', async () => {
-    writeFile('/index.ts', `
-        import { ExtraOptions } from '@angular/router';
-        const options = {useHash: true} as ExtraOptions;
-      `);
-
-    await runMigration();
-    expect(tree.readContent('/index.ts'))
-        .toContain(
-            `const options = { useHash: true, relativeLinkResolution: 'legacy' } as ExtraOptions;`);
-  });
-
-  it('should migrate when options is a variable', async () => {
-    writeFile('/index.ts', `
-        import { ExtraOptions } from '@angular/router';
-        const options: ExtraOptions = {useHash: true};
-      `);
-
-    await runMigration();
-    expect(tree.readContent('/index.ts'))
-        .toContain(
-            `const options: ExtraOptions = { useHash: true, relativeLinkResolution: 'legacy' };`);
-  });
-
-  it('should migrate when options is a variable with no type', async () => {
-    writeFile('/index.ts', `
-        import { NgModule } from '@angular/core';
-        import { ExtraOptions, RouterModule } from '@angular/router';
-
-        const options = {useHash: true};
-
-        @NgModule({
-          imports: [
-            RouterModule.forRoot([], options),
-          ]
-        })
-        export class AppModule {
-        }
-      `);
-
-    await runMigration();
-    expect(tree.readContent('/index.ts'))
-        .toContain(`const options = { useHash: true, relativeLinkResolution: 'legacy' };`);
-    expect(tree.readContent('/index.ts')).toContain(`RouterModule.forRoot([], options)`);
-  });
-
-  it('should migrate when aliased options is a variable', async () => {
-    writeFile('/index.ts', `
-        import { ExtraOptions as RouterExtraOptions } from '@angular/router';
-        const options: RouterExtraOptions = {useHash: true};
-      `);
-
-    await runMigration();
-    expect(tree.readContent('/index.ts'))
-        .toContain(
-            `const options: RouterExtraOptions = { useHash: true, relativeLinkResolution: 'legacy' };`);
-  });
-
-  it('should migrate aliased RouterModule.forRoot', async () => {
-    writeFile('/index.ts', `
-        import { NgModule } from '@angular/core';
-        import { RouterModule as AngularRouterModule} from '@angular/router';
-        @NgModule({
-          imports: [
-            AngularRouterModule.forRoot([]),
-          ]
-        })
-        export class AppModule {
-        }
-      `);
-
-    await runMigration();
-    expect(tree.readContent('/index.ts'))
-        .toContain(`AngularRouterModule.forRoot([], { relativeLinkResolution: 'legacy' }),`);
-  });
-
-  function writeFile(filePath: string, contents: string) {
-    host.sync.write(normalize(filePath), virtualFs.stringToFileBuffer(contents));
-  }
-
-  function runMigration() {
-    return runner
-        .runSchematicAsync('migration-v11-router-relative-link-resolution-default', {}, tree)
-        .toPromise();
-  }
+       const content = tree.readContent('/index.ts');
+       expect(content).toContain(`const routerConfig = {}`);
+     });
 });

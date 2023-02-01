@@ -1,33 +1,25 @@
-## relativeLinkResolution migration
+## Relative link resolution migration
 
-The default value for `relativeLinkResolution` is changing from 'legacy' to 'corrected'.
-This migration updates `RouterModule` configurations that use the default value to 
-now specifically use 'legacy' to prevent breakages when updating.
+As of Angular v15, the deprecated `relativeLinkResolution` config option of the Router is removed.
+This migration cleans up (removes) the `relativeLinkResolution` fields from the Router config objects
+in applications code.
 
 #### Before
 ```ts
-import { NgModule } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-@NgModule({
-  imports: [
-    RouterModule.forRoot(ROUTES),
-  ]
-})
-export class AppModule {
-}
+RouterModule.forRoot([], {
+  relativeLinkResolution: 'legacy',
+  enableTracing: false,
+});
 ```
 
 #### After
 ```ts
-import { NgModule } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-@NgModule({
-  imports: [
-    RouterModule.forRoot(ROUTES, {relativeLinkResolution: 'legacy'}),
-  ]
-})
-export class AppModule {
-}
+RouterModule.forRoot([], {
+  // the `relativeLinkResolution` is removed
+  enableTracing: false,
+});
 ```

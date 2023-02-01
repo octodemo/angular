@@ -123,6 +123,7 @@
     '.folder-cli',
     '.folder-docs',
     '.folder-errors',
+    '.folder-extended-diagnostics',
     '.folder-guide',
     '.folder-start',
     '.folder-tutorial',
@@ -191,5 +192,20 @@
     #{$selectors} {
       @content;
     }
+  }
+}
+
+@mixin external-link-with-icon() {
+  display: inline-flex;
+  align-items: center;
+
+  &::after {
+    content: "\e89e"; // codepoint for "open_in_new"
+    font-family: "Material Icons";
+    margin-left: 0.3rem;
+    // Note: float: right is used so that the icon doesn't inherit text underlines
+    float: right;
+    display: flex;
+    align-items: center;
   }
 }

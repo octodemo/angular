@@ -17,6 +17,7 @@ export const NAMESPACE_URIS: {[ns: string]: string} = {
   'xlink': 'http://www.w3.org/1999/xlink',
   'xml': 'http://www.w3.org/XML/1998/namespace',
   'xmlns': 'http://www.w3.org/2000/xmlns/',
+  'math': 'http://www.w3.org/1998/MathML/',
 };
 
 const COMPONENT_REGEX = /%COMP%/g;
@@ -34,19 +35,10 @@ export function shimHostAttribute(componentShortId: string): string {
   return HOST_ATTR.replace(COMPONENT_REGEX, componentShortId);
 }
 
-export function flattenStyles(
-    compId: string, styles: Array<any|any[]>, target: string[]): string[] {
-  for (let i = 0; i < styles.length; i++) {
-    let style = styles[i];
-
-    if (Array.isArray(style)) {
-      flattenStyles(compId, style, target);
-    } else {
-      style = style.replace(COMPONENT_REGEX, compId);
-      target.push(style);
-    }
-  }
-  return target;
+export function flattenStyles(compId: string, styles: Array<string|string[]>): string[] {
+  // Cannot use `Infinity` as depth as `infinity` is not a number literal in TypeScript.
+  // See: https://github.com/microsoft/TypeScript/issues/32277
+  return styles.flat(100).map(s => s.replace(COMPONENT_REGEX, compId));
 }
 
 function decoratePreventDefault(eventHandler: Function): Function {
@@ -74,8 +66,6 @@ function decoratePreventDefault(eventHandler: Function): Function {
   };
 }
 
-let hasLoggedNativeEncapsulationWarning = false;
-
 @Injectable()
 export class DomRendererFactory2 implements RendererFactory2 {
   private rendererByCompId = new Map<string, Renderer2>();
@@ -102,25 +92,11 @@ export class DomRendererFactory2 implements RendererFactory2 {
         (<EmulatedEncapsulationDomRenderer2>renderer).applyToHost(element);
         return renderer;
       }
-      // @ts-ignore TODO: Remove as part of FW-2290. TS complains about us dealing with an enum
-      // value that is not known (but previously was the value for ViewEncapsulation.Native)
-      case 1:
       case ViewEncapsulation.ShadowDom:
-        // TODO(FW-2290): remove the `case 1:` fallback logic and the warning in v12.
-        if ((typeof ngDevMode === 'undefined' || ngDevMode) &&
-            // @ts-ignore TODO: Remove as part of FW-2290. TS complains about us dealing with an
-            // enum value that is not known (but previously was the value for
-            // ViewEncapsulation.Native)
-            !hasLoggedNativeEncapsulationWarning && type.encapsulation === 1) {
-          hasLoggedNativeEncapsulationWarning = true;
-          console.warn(
-              'ViewEncapsulation.Native is no longer supported. Falling back to ViewEncapsulation.ShadowDom. The fallback will be removed in v12.');
-        }
-
         return new ShadowDomRenderer(this.eventManager, this.sharedStylesHost, element, type);
       default: {
         if (!this.rendererByCompId.has(type.id)) {
-          const styles = flattenStyles(type.id, type.styles, []);
+          const styles = flattenStyles(type.id, type.styles);
           this.sharedStylesHost.addStyles(styles);
           this.rendererByCompId.set(type.id, this.defaultRenderer);
         }
@@ -140,12 +116,19 @@ class DefaultDomRenderer2 implements Renderer2 {
 
   destroy(): void {}
 
-  destroyNode: null;
+  destroyNode = null;
 
   createElement(name: string, namespace?: string): any {
     if (namespace) {
-      // In cases where Ivy (not ViewEngine) is giving us the actual namespace, the look up by key
-      // will result in undefined, so we just return the namespace here.
+      // TODO: `|| namespace` was added in
+      // https://github.com/angular/angular/commit/2b9cc8503d48173492c29f5a271b61126104fbdb to
+      // support how Ivy passed around the namespace URI rather than short name at the time. It did
+      // not, however extend the support to other parts of the system (setAttribute, setAttribute,
+      // and the ServerRenderer). We should decide what exactly the semantics for dealing with
+      // namespaces should be and make it consistent.
+      // Related issues:
+      // https://github.com/angular/angular/issues/44028
+      // https://github.com/angular/angular/issues/44883
       return document.createElementNS(NAMESPACE_URIS[namespace] || namespace, name);
     }
 
@@ -161,12 +144,14 @@ class DefaultDomRenderer2 implements Renderer2 {
   }
 
   appendChild(parent: any, newChild: any): void {
-    parent.appendChild(newChild);
+    const targetParent = isTemplateNode(parent) ? parent.content : parent;
+    targetParent.appendChild(newChild);
   }
 
   insertBefore(parent: any, newChild: any, refChild: any): void {
     if (parent) {
-      parent.insertBefore(newChild, refChild);
+      const targetParent = isTemplateNode(parent) ? parent.content : parent;
+      targetParent.insertBefore(newChild, refChild);
     }
   }
 
@@ -199,8 +184,6 @@ class DefaultDomRenderer2 implements Renderer2 {
   setAttribute(el: any, name: string, value: string, namespace?: string): void {
     if (namespace) {
       name = namespace + ':' + name;
-      // TODO(FW-811): Ivy may cause issues here because it's passing around
-      // full URIs for namespaces, therefore this lookup will fail.
       const namespaceUri = NAMESPACE_URIS[namespace];
       if (namespaceUri) {
         el.setAttributeNS(namespaceUri, name, value);
@@ -214,15 +197,10 @@ class DefaultDomRenderer2 implements Renderer2 {
 
   removeAttribute(el: any, name: string, namespace?: string): void {
     if (namespace) {
-      // TODO(FW-811): Ivy may cause issues here because it's passing around
-      // full URIs for namespaces, therefore this lookup will fail.
       const namespaceUri = NAMESPACE_URIS[namespace];
       if (namespaceUri) {
         el.removeAttributeNS(namespaceUri, name);
       } else {
-        // TODO(FW-811): Since ivy is passing around full URIs for namespaces
-        // this could result in properties like `http://www.w3.org/2000/svg:cx="123"`,
-        // which is wrong.
         el.removeAttribute(`${namespace}:${name}`);
       }
     } else {
@@ -280,9 +258,15 @@ class DefaultDomRenderer2 implements Renderer2 {
 const AT_CHARCODE = (() => '@'.charCodeAt(0))();
 function checkNoSyntheticProp(name: string, nameKind: string) {
   if (name.charCodeAt(0) === AT_CHARCODE) {
-    throw new Error(`Found the synthetic ${nameKind} ${
-        name}. Please include either "BrowserAnimationsModule" or "NoopAnimationsModule" in your application.`);
+    throw new Error(`Unexpected synthetic ${nameKind} ${name} found. Please make sure that:
+  - Either \`BrowserAnimationsModule\` or \`NoopAnimationsModule\` are imported in your application.
+  - There is corresponding configuration for the animation named \`${
+        name}\` defined in the \`animations\` field of the \`@Component\` decorator (see https://angular.io/api/core/Component#animations).`);
   }
+}
+
+function isTemplateNode(node: any): node is HTMLTemplateElement {
+  return node.tagName === 'TEMPLATE' && node.content !== undefined;
 }
 
 class EmulatedEncapsulationDomRenderer2 extends DefaultDomRenderer2 {
@@ -293,7 +277,7 @@ class EmulatedEncapsulationDomRenderer2 extends DefaultDomRenderer2 {
       eventManager: EventManager, sharedStylesHost: DomSharedStylesHost,
       private component: RendererType2, appId: string) {
     super(eventManager);
-    const styles = flattenStyles(appId + '-' + component.id, component.styles, []);
+    const styles = flattenStyles(appId + '-' + component.id, component.styles);
     sharedStylesHost.addStyles(styles);
 
     this.contentAttr = shimContentAttribute(appId + '-' + component.id);
@@ -320,7 +304,7 @@ class ShadowDomRenderer extends DefaultDomRenderer2 {
     super(eventManager);
     this.shadowRoot = (hostEl as any).attachShadow({mode: 'open'});
     this.sharedStylesHost.addHost(this.shadowRoot);
-    const styles = flattenStyles(component.id, component.styles, []);
+    const styles = flattenStyles(component.id, component.styles);
     for (let i = 0; i < styles.length; i++) {
       const styleEl = document.createElement('style');
       styleEl.textContent = styles[i];

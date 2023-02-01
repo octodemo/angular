@@ -7,6 +7,7 @@
  */
 
 import {DEFAULT_CURRENCY_CODE, Inject, LOCALE_ID, Pipe, PipeTransform} from '@angular/core';
+
 import {formatCurrency, formatNumber, formatPercent} from '../i18n/format_number';
 import {getCurrencySymbol} from '../i18n/locale_data_api';
 
@@ -64,7 +65,7 @@ import {invalidPipeArgumentError} from './invalid_pipe_argument_error';
  *
  * When not supplied, uses the value of `LOCALE_ID`, which is `en-US` by default.
  *
- * See [Setting your app locale](guide/i18n#setting-up-the-locale-of-your-app).
+ * See [Setting your app locale](guide/i18n-common-locale-id).
  *
  * ### Example
  *
@@ -76,7 +77,10 @@ import {invalidPipeArgumentError} from './invalid_pipe_argument_error';
  *
  * @publicApi
  */
-@Pipe({name: 'number'})
+@Pipe({
+  name: 'number',
+  standalone: true,
+})
 export class DecimalPipe implements PipeTransform {
   constructor(@Inject(LOCALE_ID) private _locale: string) {}
 
@@ -100,7 +104,7 @@ export class DecimalPipe implements PipeTransform {
       const num = strToNumber(value);
       return formatNumber(num, locale, digitsInfo);
     } catch (error) {
-      throw invalidPipeArgumentError(DecimalPipe, error.message);
+      throw invalidPipeArgumentError(DecimalPipe, (error as Error).message);
     }
   }
 }
@@ -125,7 +129,10 @@ export class DecimalPipe implements PipeTransform {
  *
  * @publicApi
  */
-@Pipe({name: 'percent'})
+@Pipe({
+  name: 'percent',
+  standalone: true,
+})
 export class PercentPipe implements PipeTransform {
   constructor(@Inject(LOCALE_ID) private _locale: string) {}
 
@@ -146,7 +153,7 @@ export class PercentPipe implements PipeTransform {
    * Default is `0`.
    * @param locale A locale code for the locale format rules to use.
    * When not supplied, uses the value of `LOCALE_ID`, which is `en-US` by default.
-   * See [Setting your app locale](guide/i18n#setting-up-the-locale-of-your-app).
+   * See [Setting your app locale](guide/i18n-common-locale-id).
    */
   transform(value: number|string|null|undefined, digitsInfo?: string, locale?: string): string
       |null {
@@ -156,7 +163,7 @@ export class PercentPipe implements PipeTransform {
       const num = strToNumber(value);
       return formatPercent(num, locale, digitsInfo);
     } catch (error) {
-      throw invalidPipeArgumentError(PercentPipe, error.message);
+      throw invalidPipeArgumentError(PercentPipe, (error as Error).message);
     }
   }
 }
@@ -177,7 +184,7 @@ export class PercentPipe implements PipeTransform {
  * The default currency code is currently always `USD` but this is deprecated from v9.
  *
  * **In v11 the default currency code will be taken from the current locale identified by
- * the `LOCALE_ID` token. See the [i18n guide](guide/i18n#setting-up-the-locale-of-your-app) for
+ * the `LOCALE_ID` token. See the [i18n guide](guide/i18n-common-locale-id) for
  * more information.**
  *
  * If you need the previous behavior then set it by creating a `DEFAULT_CURRENCY_CODE` provider in
@@ -201,7 +208,10 @@ export class PercentPipe implements PipeTransform {
  *
  * @publicApi
  */
-@Pipe({name: 'currency'})
+@Pipe({
+  name: 'currency',
+  standalone: true,
+})
 export class CurrencyPipe implements PipeTransform {
   constructor(
       @Inject(LOCALE_ID) private _locale: string,
@@ -250,7 +260,7 @@ export class CurrencyPipe implements PipeTransform {
    * For example, the Canadian dollar has 2 digits, whereas the Chilean peso has none.
    * @param locale A locale code for the locale format rules to use.
    * When not supplied, uses the value of `LOCALE_ID`, which is `en-US` by default.
-   * See [Setting your app locale](guide/i18n#setting-up-the-locale-of-your-app).
+   * See [Setting your app locale](guide/i18n-common-locale-id).
    */
   transform(
       value: number|string|null|undefined, currencyCode: string = this._defaultCurrencyCode,
@@ -281,7 +291,7 @@ export class CurrencyPipe implements PipeTransform {
       const num = strToNumber(value);
       return formatCurrency(num, locale, currency, currencyCode, digitsInfo);
     } catch (error) {
-      throw invalidPipeArgumentError(CurrencyPipe, error.message);
+      throw invalidPipeArgumentError(CurrencyPipe, (error as Error).message);
     }
   }
 }

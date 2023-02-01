@@ -26,7 +26,7 @@ export class MockClient implements Client {
 
 export class MockWindowClient extends MockClient implements WindowClient {
   readonly focused: boolean = false;
-  readonly visibilityState: VisibilityState = 'visible';
+  readonly visibilityState: DocumentVisibilityState = 'visible';
 
   constructor(id: string, url: string, frameType: FrameType = 'top-level') {
     super(id, url, 'window', frameType);

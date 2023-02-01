@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {ResourceLoader, ResourceLoaderContext} from '../../annotations';
 import {NgCompilerAdapter, ResourceHostContext} from '../../core/api';
@@ -261,5 +261,8 @@ function createLookupResolutionHost(adapter: NgCompilerAdapter):
     getDirectories: adapter.getDirectories?.bind(adapter),
     realpath: adapter.realpath?.bind(adapter),
     trace: adapter.trace?.bind(adapter),
+    useCaseSensitiveFileNames: typeof adapter.useCaseSensitiveFileNames === 'function' ?
+        adapter.useCaseSensitiveFileNames.bind(adapter) :
+        adapter.useCaseSensitiveFileNames
   };
 }

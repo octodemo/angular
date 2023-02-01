@@ -16,9 +16,14 @@ function createPackage(changedFile) {
 
   const tutorialMatch = /^aio\/content\/tutorial\/([^.]+)\.md/.exec(changedFile);
   const tutorialExampleMatch = /^aio\/content\/examples\/(toh-[^/]+)\//.exec(changedFile);
+  let tutorialName = '';
   if (tutorialMatch || tutorialExampleMatch) {
-    const tutorialName = tutorialMatch && tutorialMatch[1] || tutorialExampleMatch[1];
-    console.log('Building tutorial docs');
+    if (tutorialExampleMatch) {
+      tutorialName = 'tour-of-heroes/' + tutorialExampleMatch[1];
+    } else {
+      tutorialName = tutorialMatch[1];
+    }
+    console.log('Building tutorial docs for: ', tutorialName);
     return require('./tutorial-package').createPackage(tutorialName);
   }
 
@@ -44,6 +49,18 @@ function createPackage(changedFile) {
     const packageName = apiExamplesMatch && apiExamplesMatch[1] || apiMatch[1];
     console.log('Building API docs for', packageName);
     return require('./api-package').createPackage(packageName);
+  }
+
+  const errorsMatch = /^aio\/content\/error\/([^.]+)\.md/.exec(changedFile);
+  if (errorsMatch) {
+    console.log('Building errors docs');
+    return require('./errors-package').createPackage();
+  }
+
+  const diagnosticsMatch = /^aio\/content\/extended-diagnostics\/([^.]+)\.md/.exec(changedFile);
+  if (diagnosticsMatch) {
+    console.log('Building extended diagnostics docs');
+    return require('./extended-diagnostics-package').createPackage();
   }
 }
 

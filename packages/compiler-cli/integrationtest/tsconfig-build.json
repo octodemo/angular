@@ -4,15 +4,14 @@
     "annotationsAs": "static fields",
     "debug": true,
     "enableSummariesForJit": true,
-    "i18nFormat": "xlf",
-    "enableIvy": false
+    "i18nFormat": "xlf"
   },
 
   "compilerOptions": {
     "baseUrl": ".",
     "declaration": true,
     "experimentalDecorators": true,
-    "lib": ["es6", "dom"],
+    "lib": ["es2015", "dom"],
     "moduleResolution": "node",
     "noImplicitAny": true,
     "noUnusedLocals": true,
@@ -23,7 +22,7 @@
     // compatible with the option. Disabled until the integration test support the strict flag.
     // TODO(devversion): this has been enabled without the integration test code being
     "strictPropertyInitialization": false,
-    "target": "es5",
+    "target": "es2015",
     "typeRoots": ["node_modules/@types"]
   },
 
@@ -31,6 +30,5 @@
     "src/module",
     "src/bootstrap",
     "test/all_spec",
-    "test/test_ngtools_api"
   ]
 }

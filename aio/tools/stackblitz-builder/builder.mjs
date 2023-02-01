@@ -1,31 +1,26 @@
 // Canonical path provides a consistent path (i.e. always forward slashes) across different OSes
 import path from 'canonical-path';
 import fs from 'fs-extra';
-import {globbySync} from 'globby';
+import { globbySync } from 'globby';
 import jsdom from 'jsdom';
-import json5 from 'json5';
-import {fileURLToPath} from 'url';
 
 import regionExtractor from '../transforms/examples-package/services/region-parser.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 export class StackblitzBuilder {
-  constructor(basePath, destPath) {
-    this.basePath = basePath;
+  constructor(examplePath, destPath) {
+    this.examplePath = examplePath;
     this.destPath = destPath;
-
     this.copyrights = this._buildCopyrightStrings();
     this._boilerplatePackageJsons = {};
   }
 
   build() {
     this._checkForOutdatedConfig();
+    const fileNames = this._getConfigFileNames();
+    if (fileNames.length == 0) {
+      throw new Error(`Missing stackblitz configuration file(s) from example directory ${this.examplePath}. Did you forget to include a stackblitz.json?`);
+    }
 
-    // When testing it sometimes helps to look a just one example directory like so:
-    // const stackblitzPaths = path.join(this.basePath, '**/testing/*stackblitz.json');
-    const stackblitzPaths = path.join(this.basePath, '**/*stackblitz.json');
-    const fileNames = globbySync(stackblitzPaths, { ignore: ['**/node_modules/**'] });
     let failed = false;
     fileNames.forEach((configFileName) => {
       try {
@@ -41,17 +36,13 @@ export class StackblitzBuilder {
     }
   }
 
-  _addDependencies(config, postData) {
-    // Extract npm package dependencies
-    const exampleType = this._getExampleType(config.basePath);
-    const packageJson = this._getBoilerplatePackageJson(exampleType) || this._getBoilerplatePackageJson('cli');
-    const exampleDependencies = packageJson.dependencies;
-
-    // Add unit test packages from devDependencies for unit test examples
-    const devDependencies = packageJson.devDependencies;
-    (config.devDependencies || []).forEach(dep => exampleDependencies[dep] = devDependencies[dep]);
-
-    postData.dependencies = JSON.stringify(exampleDependencies);
+  _getConfigFileNames() {
+    const stackblitzPaths = path.join(this.examplePath, '*stackblitz.json');
+    const fileNames = globbySync(stackblitzPaths, {
+      dot: true // Include subpaths that begin with '.' when using a wildcard inclusion.
+                // Needed to include the bazel .cache folder on Linux.
+    });
+    return fileNames;
   }
 
   _getExampleType(exampleDir) {
@@ -93,40 +84,27 @@ export class StackblitzBuilder {
   //   main: string - name of file that will become index.html in the stackblitz - defaults to index.html
   //   file: string - name of file to display within the stackblitz (e.g. `"file": "app/app.module.ts"`)
   _buildStackblitzFrom(configFileName) {
-    // replace ending 'stackblitz.json' with 'stackblitz.no-link.html' to create output file name;
-    const outputFileName = configFileName.replace(/stackblitz\.json$/, 'stackblitz.no-link.html');
-    let altFileName;
-    if (this.destPath && this.destPath.length > 0) {
-      const partPath = path.dirname(path.relative(this.basePath, outputFileName));
-      altFileName = path.join(this.destPath, partPath, path.basename(outputFileName)).replace('.no-link.', '.');
-    }
-    try {
-      const config = this._initConfigAndCollectFileNames(configFileName);
-      const postData = this._createPostData(config, configFileName);
-      this._addDependencies(config, postData);
-      const html = this._createStackblitzHtml(config, postData);
-      fs.writeFileSync(outputFileName, html, 'utf-8');
-      if (altFileName) {
-        const altDirName = path.dirname(altFileName);
-        fs.ensureDirSync(altDirName);
-        fs.writeFileSync(altFileName, html, 'utf-8');
-      }
-    } catch (e) {
-      // if we fail delete the outputFile if it exists because it is an old one.
-      if (fs.existsSync(outputFileName)) {
-        fs.unlinkSync(outputFileName);
-      }
-      if (altFileName && fs.existsSync(altFileName)) {
-        fs.unlinkSync(altFileName);
-      }
-      throw e;
-    }
+    // replace ending 'stackblitz.json' with 'stackblitz.html' to create output file name;
+    const outputFileName = configFileName.replace(/stackblitz\.json$/, 'stackblitz.html');
+    const outputFilePath = path.join(this.destPath, path.basename(outputFileName));
+    const config = this._initConfigAndCollectFileNames(configFileName);
+    const postData = this._createPostData(config, configFileName);
+
+    this._addStackblitzrc(postData);
+
+    const html = this._createStackblitzHtml(config, postData);
+    const outputDirName = path.dirname(outputFilePath);
+    fs.ensureDirSync(outputDirName);
+    fs.writeFileSync(outputFilePath, html, 'utf-8');
   }
 
   _checkForOutdatedConfig() {
     // Ensure that nobody is trying to use the old config filenames (i.e. `plnkr.json`).
-    const plunkerPaths = path.join(this.basePath, '**/*plnkr.json');
-    const fileNames = globbySync(plunkerPaths, { ignore: ['**/node_modules/**'] });
+    const plunkerPaths = path.join(this.examplePath, '**/*plnkr.json');
+    const fileNames = globbySync(plunkerPaths, { ignore: ['**/node_modules/**'],
+      dot: true // Include subpaths that begin with '.' when using a wildcard inclusion.
+                // Needed to include the bazel .cache folder on Linux.
+    });
 
     if (fileNames.length) {
       const readmePath = path.join(__dirname, 'README.md');
@@ -159,9 +137,19 @@ export class StackblitzBuilder {
     }
   }
 
+  _addStackblitzrc(postData) {
+    postData['project[files][.stackblitzrc]'] = JSON.stringify({
+      installDependencies: true,
+      startCommand: 'turbo start',
+      env: {
+        ENABLE_CJS_IMPORTS: true
+      }
+    });
+  }
+
   _createBaseStackblitzHtml(config) {
     const file = `?file=${this._getPrimaryFile(config)}`;
-    const action = `https://run.stackblitz.com/api/angular/v1${file}`;
+    const action = `https://stackblitz.com/run${file}`;
 
     return `
       <!DOCTYPE html><html lang="en"><body>
@@ -194,12 +182,7 @@ export class StackblitzBuilder {
     config.fileNames.forEach((fileName) => {
       let content;
       const extn = path.extname(fileName);
-      if (extn === '.png') {
-        content = this._encodeBase64(fileName);
-        fileName = `${fileName.slice(0, -extn.length)}.base64${extn}`;
-      } else {
-        content = fs.readFileSync(fileName, 'utf-8');
-      }
+      content = fs.readFileSync(fileName, 'utf-8');
 
       if (extn === '.js' || extn === '.ts' || extn === '.css') {
         content = content + this.copyrights.jsCss;
@@ -230,27 +213,16 @@ export class StackblitzBuilder {
         }
       }
 
-      content = regionExtractor()(content, extn.substr(1)).contents;
+      content = regionExtractor()(content, extn.slice(1)).contents;
 
-      postData[`files[${relativeFileName}]`] = content;
+      postData[`project[files][${relativeFileName}]`] = content;
     });
 
-    // Stackblitz defaults to ViewEngine unless `"enableIvy": true`
-    // So if there is a tsconfig.json file and there is no `enableIvy` property, we need to
-    // explicitly set it.
-    const tsConfigJSON = postData['files[tsconfig.json]'];
-    if (tsConfigJSON !== undefined) {
-      const tsConfig = json5.parse(tsConfigJSON);
-      if (tsConfig.angularCompilerOptions.enableIvy === undefined) {
-        tsConfig.angularCompilerOptions.enableIvy = true;
-        postData['files[tsconfig.json]'] = JSON.stringify(tsConfig, null, 2);
-      }
-    }
-
     const tags = ['angular', 'example', ...config.tags || []];
-    tags.forEach((tag, ix) => postData[`tags[${ix}]`] = tag);
+    tags.forEach((tag, ix) => postData[`project[tags][${ix}]`] = tag);
 
-    postData.description = `Angular Example - ${config.description}`;
+    postData['project[description]'] = `Angular Example - ${config.description}`;
+    postData['project[template]'] = 'node';
 
     return postData;
   }
@@ -284,7 +256,7 @@ export class StackblitzBuilder {
     const config = this._parseConfig(configFileName);
 
     const defaultIncludes = ['**/*.ts', '**/*.js', '**/*.css', '**/*.html', '**/*.md', '**/*.json', '**/*.png', '**/*.svg'];
-    const boilerplateIncludes = ['src/environments/*.*', 'angular.json', 'src/polyfills.ts', 'tsconfig.json'];
+    const boilerplateIncludes = ['src/environments/*.*', 'src/polyfills.ts', '*.json'];
     if (config.files) {
       if (config.files.length > 0) {
         if (config.files[0][0] === '!') {
@@ -300,7 +272,7 @@ export class StackblitzBuilder {
     const gpaths = config.files.map((fileName) => {
       fileName = fileName.trim();
       if (fileName[0] === '!') {
-        return '!' + path.join(config.basePath, fileName.substr(1));
+        return '!' + path.join(config.basePath, fileName.slice(1));
       } else {
         includeSpec = includeSpec || /\.spec\.(ts|js)$/.test(fileName);
         return path.join(config.basePath, fileName);
@@ -309,15 +281,9 @@ export class StackblitzBuilder {
 
     const defaultExcludes = [
       '!**/e2e/**/*.*',
-      '!**/package.json',
       '!**/example-config.json',
-      '!**/tslint.json',
       '!**/.editorconfig',
       '!**/wallaby.js',
-      '!**/karma-test-shim.js',
-      '!**/karma.conf.js',
-      '!**/test.ts',
-      '!**/tsconfig.app.json',
       '!**/*stackblitz.*'
     ];
 
@@ -328,7 +294,11 @@ export class StackblitzBuilder {
 
     gpaths.push(...defaultExcludes);
 
-    config.fileNames = globbySync(gpaths, { ignore: ['**/node_modules/**'] });
+    config.fileNames = globbySync(gpaths, {
+      ignore: ['**/node_modules/**'],
+      dot: true // Include subpaths that begin with '.' when using a wildcard inclusion.
+                // Needed to include the bazel .cache folder on Linux.
+    });
 
     return config;
   }

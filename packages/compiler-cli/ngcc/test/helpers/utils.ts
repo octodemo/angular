@@ -5,11 +5,14 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {absoluteFrom, AbsoluteFsPath, getFileSystem, NgtscCompilerHost} from '../../../src/ngtsc/file_system';
 import {TestFile} from '../../../src/ngtsc/file_system/testing';
+import {ClusterWorkerScriptResolver} from '../../src/execution/cluster/master';
 import {DtsProcessing} from '../../src/execution/tasks/api';
+import {LockFilePathResolver} from '../../src/locking/lock_file';
+import {LockFileUnlockerScriptResolver} from '../../src/locking/lock_file_with_child_process';
 import {BundleProgram, makeBundleProgram} from '../../src/packages/bundle_program';
 import {NgccEntryPointConfig} from '../../src/packages/configuration';
 import {EntryPoint, EntryPointFormat} from '../../src/packages/entry_point';
@@ -26,6 +29,7 @@ export function makeTestEntryPoint(
     path: absoluteFrom(`/node_modules/${entryPointName}`),
     packageName,
     packagePath: absoluteFrom(`/node_modules/${packageName}`),
+    repositoryUrl: `https://github.com/${packageName}`,
     packageJson: {name: entryPointName},
     typings: absoluteFrom(`/node_modules/${entryPointName}/index.d.ts`),
     compiledByAngular: true,
@@ -72,7 +76,8 @@ export function makeTestBundleProgram(
   const options: ts.CompilerOptions =
       {allowJs: true, maxNodeModuleJsDepth: Infinity, checkJs: false, rootDir, rootDirs: [rootDir]};
   const moduleResolutionCache = createModuleResolutionCache(fs);
-  const entryPointFileCache = new EntryPointFileCache(fs, new SharedFileCache(fs));
+  const entryPointFileCache =
+      new EntryPointFileCache(fs, new SharedFileCache(fs), sourceText => sourceText);
   const host =
       new NgccSourcesCompilerHost(fs, options, entryPointFileCache, moduleResolutionCache, rootDir);
   return makeBundleProgram(
@@ -117,4 +122,30 @@ var __assign${suffix} = null;
 
 export function getRootFiles(testFiles: TestFile[]): AbsoluteFsPath[] {
   return testFiles.filter(f => f.isRoot !== false).map(f => absoluteFrom(f.name));
+}
+
+/**
+ * Mock out the lockfile path resolution, which uses `require.resolve()`.
+ */
+export function mockRequireResolveForLockfile() {
+  spyOn(LockFilePathResolver, 'resolve')
+      .and.returnValue(absoluteFrom('/node_modules/@angular/compiler-cli/package.json'));
+}
+
+/**
+ * Mock out the worker script resolution, which uses `require.resolve()`.
+ */
+export function mockRequireResolveForWorkerScript() {
+  spyOn(ClusterWorkerScriptResolver, 'resolve')
+      .and.returnValue(absoluteFrom(
+          '/node_modules/@angular/compiler-cli/ngcc/src/execution/cluster/ngcc_cluster_worker'));
+}
+
+/**
+ * Mock out the lock file unlocker script resolution, which uses `require.resolve()`.
+ */
+export function mockRequireResolveForLockFileUnlockerScript() {
+  spyOn(LockFileUnlockerScriptResolver, 'resolve')
+      .and.returnValue(absoluteFrom(
+          '/node_modules/@angular/compiler-cli/ngcc/src/locking/lock_file_with_child_process/ngcc_lock_unlocker'));
 }

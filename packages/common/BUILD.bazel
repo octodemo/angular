@@ -1,6 +1,6 @@
 load("@build_bazel_rules_nodejs//:index.bzl", "generated_file_test")
 load("//packages/common/locales:index.bzl", "generate_base_currencies_file")
-load("//tools:defaults.bzl", "api_golden_test_npm_package", "ng_module", "ng_package")
+load("//tools:defaults.bzl", "api_golden_test", "api_golden_test_npm_package", "ng_module", "ng_package")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -21,6 +21,7 @@ generated_file_test(
 
 ng_module(
     name = "common",
+    package_name = "@angular/common",
     srcs = glob(
         [
             "*.ts",
@@ -37,12 +38,7 @@ ng_package(
     name = "npm_package",
     srcs = [
         "package.json",
-        "//packages/common/http:package.json",
-        "//packages/common/http/testing:package.json",
-        "//packages/common/testing:package.json",
-        "//packages/common/upgrade:package.json",
     ],
-    entry_point = ":index.ts",
     nested_packages = ["//packages/common/locales:package"],
     tags = [
         "release-with-framework",
@@ -50,7 +46,10 @@ ng_package(
     # Do not add more to this list.
     # Dependencies on the full npm_package cause long re-builds.
     visibility = [
-        "//integration:__pkg__",
+        "//aio:__pkg__",
+        "//aio/content/examples:__subpackages__",
+        "//aio/tools/examples:__pkg__",
+        "//integration:__subpackages__",
         "//packages/bazel/test/ng_package:__pkg__",
         "//packages/compiler-cli/integrationtest:__pkg__",
         "//packages/compiler-cli/ngcc/test:__pkg__",
@@ -77,4 +76,22 @@ api_golden_test_npm_package(
     ],
     golden_dir = "angular/goldens/public-api/common",
     npm_package = "angular/packages/common/npm_package",
+)
+
+api_golden_test(
+    name = "common_errors",
+    data = [
+        "//goldens:public-api",
+        "//packages/common",
+    ],
+    entry_point = "angular/packages/common/src/errors.d.ts",
+    golden = "angular/goldens/public-api/common/errors.md",
+)
+
+filegroup(
+    name = "files_for_docgen",
+    srcs = glob([
+        "*.ts",
+        "src/**/*.ts",
+    ]) + ["PACKAGE.md"],
 )

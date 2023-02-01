@@ -9,9 +9,9 @@
 import {forwardRef, Inject, Injectable, InjectionToken, Injector, Optional, Provider, ReflectiveInjector, ReflectiveKey, Self} from '@angular/core';
 import {ReflectiveInjector_} from '@angular/core/src/di/reflective_injector';
 import {ResolvedReflectiveProvider_} from '@angular/core/src/di/reflective_provider';
-import {getOriginalError} from '@angular/core/src/errors';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
 
+import {getOriginalError} from '../../src/util/errors';
 import {stringify} from '../../src/util/stringify';
 
 class Engine {}
@@ -300,7 +300,7 @@ describe(`injector`, () => {
     try {
       injector.get(Car);
       throw 'Must throw';
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toContain(
           `Error during instantiation of Engine! (${stringify(Car)} -> Engine)`);
       expect(getOriginalError(e) instanceof Error).toBeTruthy();
@@ -391,7 +391,7 @@ describe('instantiate', () => {
   });
 });
 
-describe('depedency resolution', () => {
+describe('dependency resolution', () => {
   describe('@Self()', () => {
     it('should return a dependency from self', () => {
       const inj = ReflectiveInjector.resolveAndCreate([
@@ -493,11 +493,9 @@ describe('resolve', () => {
   });
 
   it('should support overriding factory dependencies with dependency annotations', () => {
-    const providers = ReflectiveInjector.resolve([{
-      provide: 'token',
-      useFactory: (e: any /** TODO #9100 */) => 'result',
-      deps: [[new Inject('dep')]]
-    }]);
+    const providers = ReflectiveInjector.resolve([
+      {provide: 'token', useFactory: () => 'result', deps: [[new Inject('dep')]]},
+    ]);
 
     const provider = providers[0];
 

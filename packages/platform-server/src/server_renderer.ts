@@ -45,7 +45,7 @@ export class ServerRendererFactory2 implements RendererFactory2 {
       }
       default: {
         if (!this.rendererByCompId.has(type.id)) {
-          const styles = flattenStyles(type.id, type.styles, []);
+          const styles = flattenStyles(type.id, type.styles);
           this.sharedStylesHost.addStyles(styles);
           this.rendererByCompId.set(type.id, this.defaultRenderer);
         }
@@ -67,35 +67,35 @@ class DefaultServerRenderer2 implements Renderer2 {
 
   destroy(): void {}
 
-  destroyNode: null;
+  destroyNode = null;
 
-  createElement(name: string, namespace?: string, debugInfo?: any): any {
+  createElement(name: string, namespace?: string): any {
     if (namespace) {
       const doc = this.document || getDOM().getDefaultDocument();
-      // TODO(FW-811): Ivy may cause issues here because it's passing around
-      // full URIs for namespaces, therefore this lookup will fail.
       return doc.createElementNS(NAMESPACE_URIS[namespace], name);
     }
 
     return getDOM().createElement(name, this.document);
   }
 
-  createComment(value: string, debugInfo?: any): any {
+  createComment(value: string): any {
     return getDOM().getDefaultDocument().createComment(value);
   }
 
-  createText(value: string, debugInfo?: any): any {
+  createText(value: string): any {
     const doc = getDOM().getDefaultDocument();
     return doc.createTextNode(value);
   }
 
   appendChild(parent: any, newChild: any): void {
-    parent.appendChild(newChild);
+    const targetParent = isTemplateNode(parent) ? parent.content : parent;
+    targetParent.appendChild(newChild);
   }
 
   insertBefore(parent: any, newChild: any, refChild: any): void {
     if (parent) {
-      parent.insertBefore(newChild, refChild);
+      const targetParent = isTemplateNode(parent) ? parent.content : parent;
+      targetParent.insertBefore(newChild, refChild);
     }
   }
 
@@ -105,18 +105,16 @@ class DefaultServerRenderer2 implements Renderer2 {
     }
   }
 
-  selectRootElement(selectorOrNode: string|any, debugInfo?: any): any {
-    let el: any;
-    if (typeof selectorOrNode === 'string') {
-      el = this.document.querySelector(selectorOrNode);
-      if (!el) {
-        throw new Error(`The selector "${selectorOrNode}" did not match any elements`);
-      }
-    } else {
-      el = selectorOrNode;
+  selectRootElement(selectorOrNode: string|any, preserveContent?: boolean): any {
+    const el = typeof selectorOrNode === 'string' ? this.document.querySelector(selectorOrNode) :
+                                                    selectorOrNode;
+    if (!el) {
+      throw new Error(`The selector "${selectorOrNode}" did not match any elements`);
     }
-    while (el.firstChild) {
-      el.removeChild(el.firstChild);
+    if (!preserveContent) {
+      while (el.firstChild) {
+        el.removeChild(el.firstChild);
+      }
     }
     return el;
   }
@@ -131,8 +129,6 @@ class DefaultServerRenderer2 implements Renderer2 {
 
   setAttribute(el: any, name: string, value: string, namespace?: string): void {
     if (namespace) {
-      // TODO(FW-811): Ivy may cause issues here because it's passing around
-      // full URIs for namespaces, therefore this lookup will fail.
       el.setAttributeNS(NAMESPACE_URIS[namespace], namespace + ':' + name, value);
     } else {
       el.setAttribute(name, value);
@@ -141,8 +137,6 @@ class DefaultServerRenderer2 implements Renderer2 {
 
   removeAttribute(el: any, name: string, namespace?: string): void {
     if (namespace) {
-      // TODO(FW-811): Ivy may cause issues here because it's passing around
-      // full URIs for namespaces, therefore this lookup will fail.
       el.removeAttributeNS(NAMESPACE_URIS[namespace], name);
     } else {
       el.removeAttribute(name);
@@ -159,11 +153,12 @@ class DefaultServerRenderer2 implements Renderer2 {
 
   setStyle(el: any, style: string, value: any, flags: RendererStyleFlags2): void {
     style = style.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+    value = value == null ? '' : `${value}`.trim();
     const styleMap = _readStyleAttribute(el);
     if (flags & RendererStyleFlags2.Important) {
       value += ' !important';
     }
-    styleMap[style] = value == null ? '' : value;
+    styleMap[style] = value;
     _writeStyleAttribute(el, styleMap);
   }
 
@@ -241,9 +236,15 @@ class DefaultServerRenderer2 implements Renderer2 {
 const AT_CHARCODE = '@'.charCodeAt(0);
 function checkNoSyntheticProp(name: string, nameKind: string) {
   if (name.charCodeAt(0) === AT_CHARCODE) {
-    throw new Error(`Found the synthetic ${nameKind} ${
-        name}. Please include either "BrowserAnimationsModule" or "NoopAnimationsModule" in your application.`);
+    throw new Error(`Unexpected synthetic ${nameKind} ${name} found. Please make sure that:
+  - Either \`BrowserAnimationsModule\` or \`NoopAnimationsModule\` are imported in your application.
+  - There is corresponding configuration for the animation named \`${
+        name}\` defined in the \`animations\` field of the \`@Component\` decorator (see https://angular.io/api/core/Component#animations).`);
   }
+}
+
+function isTemplateNode(node: any): node is HTMLTemplateElement {
+  return node.tagName === 'TEMPLATE' && node.content !== undefined;
 }
 
 class EmulatedEncapsulationServerRenderer2 extends DefaultServerRenderer2 {
@@ -256,7 +257,7 @@ class EmulatedEncapsulationServerRenderer2 extends DefaultServerRenderer2 {
     super(eventManager, document, ngZone, schema);
     // Add a 's' prefix to style attributes to indicate server.
     const componentId = 's' + component.id;
-    const styles = flattenStyles(componentId, component.styles, []);
+    const styles = flattenStyles(componentId, component.styles);
     sharedStylesHost.addStyles(styles);
 
     this.contentAttr = shimContentAttribute(componentId);
@@ -268,7 +269,7 @@ class EmulatedEncapsulationServerRenderer2 extends DefaultServerRenderer2 {
   }
 
   override createElement(parent: any, name: string): Element {
-    const el = super.createElement(parent, name, this.document);
+    const el = super.createElement(parent, name);
     super.setAttribute(el, this.contentAttr, '');
     return el;
   }
@@ -286,8 +287,8 @@ function _readStyleAttribute(element: any): {[name: string]: string} {
         if (colonIndex === -1) {
           throw new Error(`Invalid CSS style: ${style}`);
         }
-        const name = style.substr(0, colonIndex).trim();
-        styleMap[name] = style.substr(colonIndex + 1).trim();
+        const name = style.slice(0, colonIndex).trim();
+        styleMap[name] = style.slice(colonIndex + 1).trim();
       }
     }
   }
@@ -295,12 +296,19 @@ function _readStyleAttribute(element: any): {[name: string]: string} {
 }
 
 function _writeStyleAttribute(element: any, styleMap: {[name: string]: string}) {
+  // We have to construct the `style` attribute ourselves, instead of going through
+  // `element.style.setProperty` like the other renderers, because `setProperty` won't
+  // write newer CSS properties that Domino doesn't know about like `clip-path`.
   let styleAttrValue = '';
   for (const key in styleMap) {
     const newValue = styleMap[key];
-    if (newValue != null) {
-      styleAttrValue += key + ':' + styleMap[key] + ';';
+    if (newValue != null && newValue !== '') {
+      styleAttrValue += key + ':' + newValue + ';';
     }
   }
-  element.setAttribute('style', styleAttrValue);
+  if (styleAttrValue) {
+    element.setAttribute('style', styleAttrValue);
+  } else {
+    element.removeAttribute('style');
+  }
 }

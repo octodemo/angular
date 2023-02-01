@@ -12,10 +12,6 @@ export function getDOM(): DomAdapter {
   return _DOM;
 }
 
-export function setDOM(adapter: DomAdapter) {
-  _DOM = adapter;
-}
-
 export function setRootDomAdapter(adapter: DomAdapter) {
   if (!_DOM) {
     _DOM = adapter;
@@ -37,7 +33,7 @@ export abstract class DomAdapter {
   // Used by Meta
   abstract remove(el: any): void;
   abstract createElement(tagName: any, doc?: any): HTMLElement;
-  abstract createHtmlDocument(): HTMLDocument;
+  abstract createHtmlDocument(): Document;
   abstract getDefaultDocument(): Document;
 
   // Used by By.css

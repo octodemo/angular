@@ -1,37 +1,8 @@
-load("@cldr_data//:index.bzl", _ALL_CLDR_LOCALES = "LOCALES")
-
-# There are a couple of locales for which no data is present, even within the
-# CLDR full tier packages. For these locales, we do not generate any data.
-# TODO(devversion): Remove once we update to CLDR v39 where this problem no longer persists.
-# Note that this worked before in the Gulp tooling without such an exclusion list because the
-# `cldr-data-downloader` overwrote the `availableLocales` to only capture locales with data.
-NO_DATA_LOCALES = [
-    "ff-Adlm",
-    "ff-Adlm-BF",
-    "ff-Adlm-CM",
-    "ff-Adlm-GH",
-    "ff-Adlm-GM",
-    "ff-Adlm-GW",
-    "ff-Adlm-LR",
-    "ff-Adlm-MR",
-    "ff-Adlm-NE",
-    "ff-Adlm-NG",
-    "ff-Adlm-SL",
-    "ff-Adlm-SN",
-    "mai",
-    "mni",
-    "mni-Beng",
-    "ms-ID",
-    "pcm",
-    "sat",
-    "sat-Olck",
-    "sd-Deva",
-    "su",
-    "su-Latn",
-]
+load("@cldr_json_data//:index.bzl", _ALL_CLDR_LOCALES = "LOCALES")
+load("@build_bazel_rules_nodejs//:index.bzl", "npm_package_bin")
 
 # List of locales the tool can generate files for.
-LOCALES = [l for l in _ALL_CLDR_LOCALES if l not in NO_DATA_LOCALES]
+LOCALES = _ALL_CLDR_LOCALES
 
 # Labels resolving to the individual `generate-locale-tool` entry-points
 GENERATE_LOCALES_TOOL_BIN = "//packages/common/locales/generate-locales-tool/bin"
@@ -66,7 +37,7 @@ def generate_base_locale_file(name, output_file, **kwargs):
         **kwargs
     )
 
-def generate_closure_locales_file(name, output_file, **kwargs):
+def generate_closure_locale_file(name, output_file, **kwargs):
     _run_tool_with_single_output(
         name = name,
         output_file = output_file,
@@ -84,11 +55,12 @@ def generate_all_locale_files(name, **kwargs):
             "extra/%s.ts" % locale,
         ]
 
-    native.genrule(
+    npm_package_bin(
         name = name,
         outs = locale_files,
-        srcs = [],
-        exec_tools = [WRITE_LOCALE_FILES_TO_DIST_BIN],
-        cmd = """$(location %s) $(@D)""" % WRITE_LOCALE_FILES_TO_DIST_BIN,
+        tool = WRITE_LOCALE_FILES_TO_DIST_BIN,
+        args = [
+            "$(@D)",
+        ],
         **kwargs
     )

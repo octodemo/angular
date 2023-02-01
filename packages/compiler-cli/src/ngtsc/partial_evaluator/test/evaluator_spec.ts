@@ -5,7 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {absoluteFrom, getSourceFileOrError} from '../../file_system';
 import {runInEachFileSystem} from '../../file_system/testing';
@@ -371,6 +371,38 @@ runInEachFileSystem(() => {
       expect(evaluate(`declare const x: ['bar'];`, `[...x]`)).toEqual(['bar']);
     });
 
+    // https://github.com/angular/angular/issues/48089
+    it('supports declarations of readonly tuples with class references', () => {
+      const tuple = evaluate(
+          `
+        import {External} from 'external';
+        declare class Local {}
+        declare const x: readonly [typeof External, typeof Local];`,
+          `x`, [
+            {
+              name: _('/node_modules/external/index.d.ts'),
+              contents: 'export declare class External {}'
+            },
+          ]);
+      if (!Array.isArray(tuple)) {
+        return fail('Should have evaluated tuple as an array');
+      }
+      const [external, local] = tuple;
+      if (!(external instanceof Reference)) {
+        return fail('Should have evaluated `typeof A` to a Reference');
+      }
+      expect(ts.isClassDeclaration(external.node)).toBe(true);
+      expect(external.debugName).toBe('External');
+      expect(external.ownedByModuleGuess).toBe('external');
+
+      if (!(local instanceof Reference)) {
+        return fail('Should have evaluated `typeof B` to a Reference');
+      }
+      expect(ts.isClassDeclaration(local.node)).toBe(true);
+      expect(local.debugName).toBe('Local');
+      expect(local.ownedByModuleGuess).toBeNull();
+    });
+
     it('evaluates tuple elements it cannot understand to DynamicValue', () => {
       const value = evaluate(`declare const x: ['foo', string];`, `x`) as [string, DynamicValue];
 
@@ -530,6 +562,17 @@ runInEachFileSystem(() => {
 
     it('string concatenation should resolve enums', () => {
       expect(evaluate('enum Test { VALUE = "test" };', '"a." + Test.VALUE + ".b"'))
+          .toBe('a.test.b');
+    });
+
+    it('string `concat` function works', () => {
+      expect(evaluate(`const a = '12', b = '34';`, 'a[\'concat\'](b)')).toBe('1234');
+      expect(evaluate(`const a = '12', b = '3';`, 'a[\'concat\'](b)')).toBe('123');
+      expect(evaluate(`const a = '12', b = '3', c = '45';`, 'a[\'concat\'](b,c)')).toBe('12345');
+      expect(
+          evaluate(`const a = '1', b = 2, c = '3', d = true, e = null;`, 'a[\'concat\'](b,c,d,e)'))
+          .toBe('123truenull');
+      expect(evaluate('enum Test { VALUE = "test" };', '"a."[\'concat\'](Test.VALUE, ".b")'))
           .toBe('a.test.b');
     });
 
@@ -760,7 +803,7 @@ runInEachFileSystem(() => {
               export declare function __assign(t: any, ...sources: any[]): any;
               export declare function __spread(...args: any[][]): any[];
               export declare function __spreadArrays(...args: any[][]): any[];
-              export declare function __spreadArray(to: any[], from: any[]): any[];
+              export declare function __spreadArray(to: any[], from: any[], pack?: boolean): any[];
               export declare function __read(o: any, n?: number): any[];
             `,
           },
@@ -870,6 +913,18 @@ runInEachFileSystem(() => {
               const b = [5, 6];
             `,
             'tslib.__spreadArray(a, b)');
+
+        expect(arr).toEqual([4, 5, 6]);
+      });
+
+      it('should evaluate `__spreadArray()` with three arguments', () => {
+        const arr: number[] = evaluateExpression(
+            `
+              import {__spreadArray} from 'tslib';
+              const a = [4];
+              const b = [5, 6];
+            `,
+            '__spreadArray(a, b, false)');
 
         expect(arr).toEqual([4, 5, 6]);
       });
@@ -1130,8 +1185,14 @@ runInEachFileSystem(() => {
       const declaration = super.getDeclarationOfIdentifier(id);
       if (declaration !== null && isConcreteDeclaration(declaration)) {
         const enumMembers = [
-          {name: ts.createStringLiteral('ValueA'), initializer: ts.createStringLiteral('a')},
-          {name: ts.createStringLiteral('ValueB'), initializer: ts.createStringLiteral('b')},
+          {
+            name: ts.factory.createStringLiteral('ValueA'),
+            initializer: ts.factory.createStringLiteral('a')
+          },
+          {
+            name: ts.factory.createStringLiteral('ValueB'),
+            initializer: ts.factory.createStringLiteral('b')
+          },
         ];
         declaration.identity = {kind: SpecialDeclarationKind.DownleveledEnum, enumMembers};
       }

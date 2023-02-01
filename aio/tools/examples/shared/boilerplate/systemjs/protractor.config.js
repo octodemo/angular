@@ -11,18 +11,17 @@
 //   To do all steps, try:  `npm run e2e`
 
 var fs = require('fs');
-var path = require('canonical-path');
 var _ = require('lodash');
-
 
 exports.config = {
   directConnect: true,
+  chromeDriver: process.env.CHROMEDRIVER_BIN,
 
   // Capabilities to be passed to the webdriver instance.
   capabilities: {
     browserName: 'chrome',
     chromeOptions: {
-      binary: require('puppeteer').executablePath(),
+      binary: process.env.CHROME_BIN,
       // See /integration/README.md#browser-tests for more info on these args
       args: ['--no-sandbox', '--headless', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars', '--mute-audio'],
     },
@@ -52,9 +51,10 @@ exports.config = {
     jasmine.getEnv().addReporter(new Reporter(browser.params.outputFile));
   },
 
+  allScriptsTimeout: 60000,
+
   jasmineNodeOpts: {
-    // defaultTimeoutInterval: 60000,
-    defaultTimeoutInterval: 10000,
+    defaultTimeoutInterval: 60000,
     showTiming: true,
     print: function() {}
   },
@@ -132,10 +132,10 @@ function Reporter(outputFile) {
           spec.failedExpectations.forEach(function (fe) {
             results.push(pad + 'message: ' + fe.message);
           });
-          pad=pad.substr(2);
+          pad=pad.slice(2);
         }
       });
-      pad = pad.substr(2);
+      pad = pad.slice(2);
       results.push('');
     });
     results.push('');
@@ -147,7 +147,7 @@ function Reporter(outputFile) {
   function log(str, indent) {
     _pad = _pad || '';
     if (indent == -1) {
-      _pad = _pad.substr(2);
+      _pad = _pad.slice(2);
     }
     console.log(_pad + str);
     if (indent == 1) {

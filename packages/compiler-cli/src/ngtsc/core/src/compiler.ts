@@ -6,9 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {ComponentDecoratorHandler, DirectiveDecoratorHandler, InjectableDecoratorHandler, NgModuleDecoratorHandler, NoopReferencesRegistry, PipeDecoratorHandler, ReferencesRegistry} from '../../annotations';
+import {InjectableClassRegistry} from '../../annotations/common';
 import {CycleAnalyzer, CycleHandlingStrategy, ImportGraph} from '../../cycles';
 import {COMPILER_ERRORS_WITH_GUIDES, ERROR_DETAILS_PAGE_BASE_URL, ErrorCode, ngErrorCode} from '../../diagnostics';
 import {checkForPrivateExports, ReferenceGraph} from '../../entry_point';
@@ -17,26 +18,24 @@ import {AbsoluteModuleStrategy, AliasingHost, AliasStrategy, DefaultImportTracke
 import {IncrementalBuildStrategy, IncrementalCompilation, IncrementalState} from '../../incremental';
 import {SemanticSymbol} from '../../incremental/semantic_graph';
 import {generateAnalysis, IndexedComponent, IndexingContext} from '../../indexer';
-import {ComponentResources, CompoundMetadataReader, CompoundMetadataRegistry, DirectiveMeta, DtsMetadataReader, InjectableClassRegistry, LocalMetadataRegistry, MetadataReader, PipeMeta, ResourceRegistry} from '../../metadata';
+import {ComponentResources, CompoundMetadataReader, CompoundMetadataRegistry, DirectiveMeta, DtsMetadataReader, HostDirectivesResolver, LocalMetadataRegistry, MetadataReader, MetadataReaderWithIndex, PipeMeta, ResourceRegistry} from '../../metadata';
+import {NgModuleIndexImpl} from '../../metadata/src/ng_module_index';
 import {PartialEvaluator} from '../../partial_evaluator';
 import {ActivePerfRecorder, DelegatingPerfRecorder, PerfCheckpoint, PerfEvent, PerfPhase} from '../../perf';
 import {FileUpdate, ProgramDriver, UpdateMode} from '../../program_driver';
 import {DeclarationNode, isNamedClassDeclaration, TypeScriptReflectionHost} from '../../reflection';
 import {AdapterResourceLoader} from '../../resource';
-import {entryPointKeyFor, NgModuleRouteAnalyzer} from '../../routing';
-import {ComponentScopeReader, LocalModuleScopeRegistry, MetadataDtsModuleScopeResolver, TypeCheckScopeRegistry} from '../../scope';
+import {ComponentScopeReader, CompoundComponentScopeReader, LocalModuleScopeRegistry, MetadataDtsModuleScopeResolver, TypeCheckScopeRegistry} from '../../scope';
+import {StandaloneComponentScopeReader} from '../../scope/src/standalone';
 import {generatedFactoryTransform} from '../../shims';
-import {ivySwitchTransform} from '../../switch';
 import {aliasTransformFactory, CompilationMode, declarationTransformFactory, DecoratorHandler, DtsTransformRegistry, ivyTransformFactory, TraitCompiler} from '../../transform';
 import {TemplateTypeCheckerImpl} from '../../typecheck';
 import {OptimizeFor, TemplateTypeChecker, TypeCheckingConfig} from '../../typecheck/api';
-import {ExtendedTemplateCheckerImpl} from '../../typecheck/extended';
-import {ExtendedTemplateChecker, TemplateCheck} from '../../typecheck/extended/api';
-import {InvalidBananaInBoxCheck} from '../../typecheck/extended/checks/invalid_banana_in_box';
-import {NullishCoalescingNotNullableCheck} from '../../typecheck/extended/checks/nullish_coalescing_not_nullable';
-import {getSourceFileOrNull, isDtsPath, resolveModuleName, toUnredirectedSourceFile} from '../../util/src/typescript';
+import {ALL_DIAGNOSTIC_FACTORIES, ExtendedTemplateCheckerImpl} from '../../typecheck/extended';
+import {ExtendedTemplateChecker} from '../../typecheck/extended/api';
+import {getSourceFileOrNull, isDtsPath, toUnredirectedSourceFile} from '../../util/src/typescript';
 import {Xi18nContext} from '../../xi18n';
-import {LazyRoute, NgCompilerAdapter, NgCompilerOptions} from '../api';
+import {DiagnosticCategoryLabel, NgCompilerAdapter, NgCompilerOptions} from '../api';
 
 /**
  * State information about a compilation which is only generated once some data is requested from
@@ -50,13 +49,12 @@ interface LazyCompilationState {
   scopeRegistry: LocalModuleScopeRegistry;
   typeCheckScopeRegistry: TypeCheckScopeRegistry;
   exportReferenceGraph: ReferenceGraph|null;
-  routeAnalyzer: NgModuleRouteAnalyzer;
   dtsTransforms: DtsTransformRegistry;
   aliasingHost: AliasingHost|null;
   refEmitter: ReferenceEmitter;
   templateTypeChecker: TemplateTypeChecker;
   resourceRegistry: ResourceRegistry;
-  extendedTemplateChecker: ExtendedTemplateChecker;
+  extendedTemplateChecker: ExtendedTemplateChecker|null;
 }
 
 
@@ -259,6 +257,7 @@ export class NgCompiler {
   private cycleAnalyzer: CycleAnalyzer;
   readonly ignoreForDiagnostics: Set<ts.SourceFile>;
   readonly ignoreForEmit: Set<ts.SourceFile>;
+  readonly enableTemplateTypeChecker: boolean;
 
   /**
    * `NgCompiler` can be reused for multiple compilations (for resource-only changes), and each
@@ -317,21 +316,14 @@ export class NgCompiler {
       readonly programDriver: ProgramDriver,
       readonly incrementalStrategy: IncrementalBuildStrategy,
       readonly incrementalCompilation: IncrementalCompilation,
-      readonly enableTemplateTypeChecker: boolean,
+      enableTemplateTypeChecker: boolean,
       readonly usePoisonedData: boolean,
       private livePerfRecorder: ActivePerfRecorder,
   ) {
-    if (this.options._extendedTemplateDiagnostics === true &&
-        this.options.strictTemplates === false) {
-      throw new Error(
-          'The \'_extendedTemplateDiagnostics\' option requires \'strictTemplates\' to also be enabled.');
-    }
-
-    this.constructionDiagnostics.push(...this.adapter.constructionDiagnostics);
-    const incompatibleTypeCheckOptionsDiagnostic = verifyCompatibleTypeCheckOptions(this.options);
-    if (incompatibleTypeCheckOptionsDiagnostic !== null) {
-      this.constructionDiagnostics.push(incompatibleTypeCheckOptionsDiagnostic);
-    }
+    this.enableTemplateTypeChecker =
+        enableTemplateTypeChecker || (options._enableTemplateTypeChecker ?? false);
+    this.constructionDiagnostics.push(
+        ...this.adapter.constructionDiagnostics, ...verifyCompatibleTypeCheckOptions(this.options));
 
     this.currentProgram = inputProgram;
     this.closureCompilerEnabled = !!this.options.annotateForClosureCompiler;
@@ -393,7 +385,7 @@ export class NgCompiler {
     perfRecorder.inPhase(PerfPhase.ResourceUpdate, () => {
       if (this.compilation === null) {
         // Analysis hasn't happened yet, so no update is necessary - any changes to resources will
-        // be captured by the inital analysis pass itself.
+        // be captured by the initial analysis pass itself.
         return;
       }
 
@@ -438,7 +430,7 @@ export class NgCompiler {
   getDiagnostics(): ts.Diagnostic[] {
     const diagnostics: ts.Diagnostic[] = [];
     diagnostics.push(...this.getNonTemplateDiagnostics(), ...this.getTemplateDiagnostics());
-    if (this.options._extendedTemplateDiagnostics) {
+    if (this.options.strictTemplates) {
       diagnostics.push(...this.getExtendedTemplateDiagnostics());
     }
     return this.addMessageTextDetails(diagnostics);
@@ -454,7 +446,7 @@ export class NgCompiler {
     diagnostics.push(
         ...this.getNonTemplateDiagnostics().filter(diag => diag.file === file),
         ...this.getTemplateDiagnosticsForFile(file, optimizeFor));
-    if (this.options._extendedTemplateDiagnostics) {
+    if (this.options.strictTemplates) {
       diagnostics.push(...this.getExtendedTemplateDiagnostics(file));
     }
     return this.addMessageTextDetails(diagnostics);
@@ -468,8 +460,9 @@ export class NgCompiler {
     const ttc = compilation.templateTypeChecker;
     const diagnostics: ts.Diagnostic[] = [];
     diagnostics.push(...ttc.getDiagnosticsForComponent(component));
-    if (this.options._extendedTemplateDiagnostics) {
-      const extendedTemplateChecker = compilation.extendedTemplateChecker;
+
+    const extendedTemplateChecker = compilation.extendedTemplateChecker;
+    if (this.options.strictTemplates && extendedTemplateChecker) {
       diagnostics.push(...extendedTemplateChecker.getDiagnosticsForComponent(component));
     }
     return this.addMessageTextDetails(diagnostics);
@@ -577,8 +570,8 @@ export class NgCompiler {
    *
    * Normally, this operation happens lazily whenever `getDiagnostics` or `prepareEmit` are called.
    * However, certain consumers may wish to allow for an asynchronous phase of analysis, where
-   * resources such as `styleUrls` are resolved asynchonously. In these cases `analyzeAsync` must be
-   * called first, and its `Promise` awaited prior to calling any other APIs of `NgCompiler`.
+   * resources such as `styleUrls` are resolved asynchronously. In these cases `analyzeAsync` must
+   * be called first, and its `Promise` awaited prior to calling any other APIs of `NgCompiler`.
    */
   async analyzeAsync(): Promise<void> {
     if (this.compilation !== null) {
@@ -605,47 +598,6 @@ export class NgCompiler {
       this.perfRecorder.memory(PerfCheckpoint.Analysis);
       this.resolveCompilation(this.compilation.traitCompiler);
     });
-  }
-
-  /**
-   * List lazy routes detected during analysis.
-   *
-   * This can be called for one specific route, or to retrieve all top-level routes.
-   */
-  listLazyRoutes(entryRoute?: string): LazyRoute[] {
-    if (entryRoute) {
-      // htts://github.com/angular/angular/blob/50732e156/packages/compiler-cli/src/transformers/compiler_host.ts#L175-L188).
-      //
-      // `@angular/cli` will always call this API with an absolute path, so the resolution step is
-      // not necessary, but keeping it backwards compatible in case someone else is using the API.
-
-      // Relative entry paths are disallowed.
-      if (entryRoute.startsWith('.')) {
-        throw new Error(`Failed to list lazy routes: Resolution of relative paths (${
-            entryRoute}) is not supported.`);
-      }
-
-      // Non-relative entry paths fall into one of the following categories:
-      // - Absolute system paths (e.g. `/foo/bar/my-project/my-module`), which are unaffected by the
-      //   logic below.
-      // - Paths to enternal modules (e.g. `some-lib`).
-      // - Paths mapped to directories in `tsconfig.json` (e.g. `shared/my-module`).
-      //   (See https://www.typescriptlang.org/docs/handbook/module-resolution.html#path-mapping.)
-      //
-      // In all cases above, the `containingFile` argument is ignored, so we can just take the first
-      // of the root files.
-      const containingFile = this.inputProgram.getRootFileNames()[0];
-      const [entryPath, moduleName] = entryRoute.split('#');
-      const resolvedModule =
-          resolveModuleName(entryPath, containingFile, this.options, this.adapter, null);
-
-      if (resolvedModule) {
-        entryRoute = entryPointKeyFor(resolvedModule.resolvedFileName, moduleName);
-      }
-    }
-
-    const compilation = this.ensureAnalyzed();
-    return compilation.routeAnalyzer.listLazyRoutes(entryRoute);
   }
 
   /**
@@ -690,7 +642,6 @@ export class NgCompiler {
       before.push(
           generatedFactoryTransform(this.adapter.factoryTracker.sourceInfo, importRewriter));
     }
-    before.push(ivySwitchTransform);
 
     return {transformers: {before, afterDeclarations} as ts.CustomTransformers};
   }
@@ -936,6 +887,10 @@ export class NgCompiler {
     const diagnostics: ts.Diagnostic[] = [];
     const compilation = this.ensureAnalyzed();
     const extendedTemplateChecker = compilation.extendedTemplateChecker;
+    if (!extendedTemplateChecker) {
+      return [];
+    }
+
     if (sf !== undefined) {
       return compilation.traitCompiler.extendedTemplateCheck(sf, extendedTemplateChecker);
     }
@@ -1008,21 +963,29 @@ export class NgCompiler {
       aliasingHost = new UnifiedModulesAliasingHost(this.adapter.unifiedModulesHost);
     }
 
+    const isCore = isAngularCorePackage(this.inputProgram);
+
     const evaluator =
         new PartialEvaluator(reflector, checker, this.incrementalCompilation.depGraph);
     const dtsReader = new DtsMetadataReader(checker, reflector);
     const localMetaRegistry = new LocalMetadataRegistry();
-    const localMetaReader: MetadataReader = localMetaRegistry;
+    const localMetaReader: MetadataReaderWithIndex = localMetaRegistry;
     const depScopeReader = new MetadataDtsModuleScopeResolver(dtsReader, aliasingHost);
-    const scopeRegistry =
-        new LocalModuleScopeRegistry(localMetaReader, depScopeReader, refEmitter, aliasingHost);
-    const scopeReader: ComponentScopeReader = scopeRegistry;
-    const semanticDepGraphUpdater = this.incrementalCompilation.semanticDepGraphUpdater;
-    const metaRegistry = new CompoundMetadataRegistry([localMetaRegistry, scopeRegistry]);
-    const injectableRegistry = new InjectableClassRegistry(reflector);
-
     const metaReader = new CompoundMetadataReader([localMetaReader, dtsReader]);
-    const typeCheckScopeRegistry = new TypeCheckScopeRegistry(scopeReader, metaReader);
+    const ngModuleIndex = new NgModuleIndexImpl(metaReader, localMetaReader);
+    const ngModuleScopeRegistry = new LocalModuleScopeRegistry(
+        localMetaReader, metaReader, depScopeReader, refEmitter, aliasingHost);
+    const standaloneScopeReader =
+        new StandaloneComponentScopeReader(metaReader, ngModuleScopeRegistry, depScopeReader);
+    const scopeReader: ComponentScopeReader =
+        new CompoundComponentScopeReader([ngModuleScopeRegistry, standaloneScopeReader]);
+    const semanticDepGraphUpdater = this.incrementalCompilation.semanticDepGraphUpdater;
+    const metaRegistry = new CompoundMetadataRegistry([localMetaRegistry, ngModuleScopeRegistry]);
+    const injectableRegistry = new InjectableClassRegistry(reflector, isCore);
+    const hostDirectivesResolver = new HostDirectivesResolver(metaReader);
+
+    const typeCheckScopeRegistry =
+        new TypeCheckScopeRegistry(scopeReader, metaReader, hostDirectivesResolver);
 
 
     // If a flat module entrypoint was specified, then track references via a `ReferenceGraph` in
@@ -1037,16 +1000,16 @@ export class NgCompiler {
       referencesRegistry = new NoopReferencesRegistry();
     }
 
-    const routeAnalyzer = new NgModuleRouteAnalyzer(this.moduleResolver, evaluator);
-
     const dtsTransforms = new DtsTransformRegistry();
-
-    const isCore = isAngularCorePackage(this.inputProgram);
 
     const resourceRegistry = new ResourceRegistry();
 
-    const compilationMode =
-        this.options.compilationMode === 'partial' ? CompilationMode.PARTIAL : CompilationMode.FULL;
+    // Note: If this compilation builds `@angular/core`, we always build in full compilation
+    // mode. Code inside the core package is always compatible with itself, so it does not
+    // make sense to go through the indirection of partial compilation
+    const compilationMode = this.options.compilationMode === 'partial' && !isCore ?
+        CompilationMode.PARTIAL :
+        CompilationMode.FULL;
 
     // Cycles are handled in full compilation mode by "remote scoping".
     // "Remote scoping" does not work well with tree shaking for libraries.
@@ -1055,25 +1018,27 @@ export class NgCompiler {
         CycleHandlingStrategy.UseRemoteScoping :
         CycleHandlingStrategy.Error;
 
+    const strictCtorDeps = this.options.strictInjectionParameters || false;
+
     // Set up the IvyCompilation, which manages state for the Ivy transformer.
     const handlers: DecoratorHandler<unknown, unknown, SemanticSymbol|null, unknown>[] = [
       new ComponentDecoratorHandler(
-          reflector, evaluator, metaRegistry, metaReader, scopeReader, scopeRegistry,
-          typeCheckScopeRegistry, resourceRegistry, isCore, this.resourceManager,
-          this.adapter.rootDirs, this.options.preserveWhitespaces || false,
+          reflector, evaluator, metaRegistry, metaReader, scopeReader, depScopeReader,
+          ngModuleScopeRegistry, typeCheckScopeRegistry, resourceRegistry, isCore, strictCtorDeps,
+          this.resourceManager, this.adapter.rootDirs, this.options.preserveWhitespaces || false,
           this.options.i18nUseExternalIds !== false,
           this.options.enableI18nLegacyMessageIdFormat !== false, this.usePoisonedData,
-          this.options.i18nNormalizeLineEndingsInICUs, this.moduleResolver, this.cycleAnalyzer,
-          cycleHandlingStrategy, refEmitter, this.incrementalCompilation.depGraph,
-          injectableRegistry, semanticDepGraphUpdater, this.closureCompilerEnabled,
-          this.delegatingPerfRecorder),
+          this.options.i18nNormalizeLineEndingsInICUs === true, this.moduleResolver,
+          this.cycleAnalyzer, cycleHandlingStrategy, refEmitter,
+          this.incrementalCompilation.depGraph, injectableRegistry, semanticDepGraphUpdater,
+          this.closureCompilerEnabled, this.delegatingPerfRecorder, hostDirectivesResolver),
 
       // TODO(alxhub): understand why the cast here is necessary (something to do with `null`
       // not being assignable to `unknown` when wrapped in `Readonly`).
       // clang-format off
         new DirectiveDecoratorHandler(
-            reflector, evaluator, metaRegistry, scopeRegistry, metaReader,
-            injectableRegistry, isCore, semanticDepGraphUpdater,
+            reflector, evaluator, metaRegistry, ngModuleScopeRegistry, metaReader,
+            injectableRegistry, refEmitter, isCore, strictCtorDeps, semanticDepGraphUpdater,
           this.closureCompilerEnabled, /** compileUndecoratedClassesWithAngularFeatures */ false,
           this.delegatingPerfRecorder,
         ) as Readonly<DecoratorHandler<unknown, unknown, SemanticSymbol | null,unknown>>,
@@ -1081,21 +1046,22 @@ export class NgCompiler {
       // Pipe handler must be before injectable handler in list so pipe factories are printed
       // before injectable factories (so injectable factories can delegate to them)
       new PipeDecoratorHandler(
-          reflector, evaluator, metaRegistry, scopeRegistry, injectableRegistry, isCore,
+          reflector, evaluator, metaRegistry, ngModuleScopeRegistry, injectableRegistry, isCore,
           this.delegatingPerfRecorder),
       new InjectableDecoratorHandler(
-          reflector, isCore, this.options.strictInjectionParameters || false, injectableRegistry,
+          reflector, evaluator, isCore, strictCtorDeps, injectableRegistry,
           this.delegatingPerfRecorder),
       new NgModuleDecoratorHandler(
-          reflector, evaluator, metaReader, metaRegistry, scopeRegistry, referencesRegistry, isCore,
-          routeAnalyzer, refEmitter, this.adapter.factoryTracker, this.closureCompilerEnabled,
-          injectableRegistry, this.delegatingPerfRecorder, this.options.i18nInLocale),
+          reflector, evaluator, metaReader, metaRegistry, ngModuleScopeRegistry, referencesRegistry,
+          isCore, refEmitter, this.adapter.factoryTracker, this.closureCompilerEnabled,
+          this.options.onlyPublishPublicTypingsForNgModules ?? false, injectableRegistry,
+          this.delegatingPerfRecorder),
     ];
 
     const traitCompiler = new TraitCompiler(
         handlers, reflector, this.delegatingPerfRecorder, this.incrementalCompilation,
         this.options.compileNonExportedClasses !== false, compilationMode, dtsTransforms,
-        semanticDepGraphUpdater);
+        semanticDepGraphUpdater, this.adapter);
 
     // Template type-checking may use the `ProgramDriver` to produce new `ts.Program`(s). If this
     // happens, they need to be tracked by the `NgCompiler`.
@@ -1107,24 +1073,22 @@ export class NgCompiler {
 
     const templateTypeChecker = new TemplateTypeCheckerImpl(
         this.inputProgram, notifyingDriver, traitCompiler, this.getTypeCheckingConfig(), refEmitter,
-        reflector, this.adapter, this.incrementalCompilation, scopeRegistry, typeCheckScopeRegistry,
-        this.delegatingPerfRecorder);
+        reflector, this.adapter, this.incrementalCompilation, metaReader, localMetaReader,
+        ngModuleIndex, scopeReader, typeCheckScopeRegistry, this.delegatingPerfRecorder);
 
-    const templateChecks: TemplateCheck<ErrorCode>[] = [new InvalidBananaInBoxCheck()];
-    if (this.options.strictNullChecks) {
-      templateChecks.push(new NullishCoalescingNotNullableCheck());
-    }
-    const extendedTemplateChecker =
-        new ExtendedTemplateCheckerImpl(templateTypeChecker, checker, templateChecks);
+    // Only construct the extended template checker if the configuration is valid and usable.
+    const extendedTemplateChecker = this.constructionDiagnostics.length === 0 ?
+        new ExtendedTemplateCheckerImpl(
+            templateTypeChecker, checker, ALL_DIAGNOSTIC_FACTORIES, this.options) :
+        null;
 
     return {
       isCore,
       traitCompiler,
       reflector,
-      scopeRegistry,
+      scopeRegistry: ngModuleScopeRegistry,
       dtsTransforms,
       exportReferenceGraph,
-      routeAnalyzer,
       metaReader,
       typeCheckScopeRegistry,
       aliasingHost,
@@ -1153,8 +1117,9 @@ export function isAngularCorePackage(program: ts.Program): boolean {
       return false;
     }
     // It must be exported.
-    if (stmt.modifiers === undefined ||
-        !stmt.modifiers.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword)) {
+    const modifiers = ts.getModifiers(stmt);
+    if (modifiers === undefined ||
+        !modifiers.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword)) {
       return false;
     }
     // It must declare ITS_JUST_ANGULAR.
@@ -1185,16 +1150,15 @@ function getR3SymbolsFile(program: ts.Program): ts.SourceFile|null {
  * "fullTemplateTypeCheck", it is required that the latter is not explicitly disabled if the
  * former is enabled.
  */
-function verifyCompatibleTypeCheckOptions(options: NgCompilerOptions): ts.Diagnostic|null {
+function*
+    verifyCompatibleTypeCheckOptions(options: NgCompilerOptions):
+        Generator<ts.Diagnostic, void, void> {
   if (options.fullTemplateTypeCheck === false && options.strictTemplates === true) {
-    return {
+    yield makeConfigDiagnostic({
       category: ts.DiagnosticCategory.Error,
-      code: ngErrorCode(ErrorCode.CONFIG_STRICT_TEMPLATES_IMPLIES_FULL_TEMPLATE_TYPECHECK),
-      file: undefined,
-      start: undefined,
-      length: undefined,
-      messageText:
-          `Angular compiler option "strictTemplates" is enabled, however "fullTemplateTypeCheck" is disabled.
+      code: ErrorCode.CONFIG_STRICT_TEMPLATES_IMPLIES_FULL_TEMPLATE_TYPECHECK,
+      messageText: `
+Angular compiler option "strictTemplates" is enabled, however "fullTemplateTypeCheck" is disabled.
 
 Having the "strictTemplates" flag enabled implies that "fullTemplateTypeCheck" is also enabled, so
 the latter can not be explicitly disabled.
@@ -1204,11 +1168,88 @@ One of the following actions is required:
 2. Remove "strictTemplates" or set it to 'false'.
 
 More information about the template type checking compiler options can be found in the documentation:
-https://v9.angular.io/guide/template-typecheck#template-type-checking`,
-    };
+https://angular.io/guide/template-typecheck
+      `.trim(),
+    });
   }
 
-  return null;
+  if (options.extendedDiagnostics && options.strictTemplates === false) {
+    yield makeConfigDiagnostic({
+      category: ts.DiagnosticCategory.Error,
+      code: ErrorCode.CONFIG_EXTENDED_DIAGNOSTICS_IMPLIES_STRICT_TEMPLATES,
+      messageText: `
+Angular compiler option "extendedDiagnostics" is configured, however "strictTemplates" is disabled.
+
+Using "extendedDiagnostics" requires that "strictTemplates" is also enabled.
+
+One of the following actions is required:
+1. Remove "strictTemplates: false" to enable it.
+2. Remove "extendedDiagnostics" configuration to disable them.
+      `.trim(),
+    });
+  }
+
+  const allowedCategoryLabels = Array.from(Object.values(DiagnosticCategoryLabel)) as string[];
+  const defaultCategory = options.extendedDiagnostics?.defaultCategory;
+  if (defaultCategory && !allowedCategoryLabels.includes(defaultCategory)) {
+    yield makeConfigDiagnostic({
+      category: ts.DiagnosticCategory.Error,
+      code: ErrorCode.CONFIG_EXTENDED_DIAGNOSTICS_UNKNOWN_CATEGORY_LABEL,
+      messageText: `
+Angular compiler option "extendedDiagnostics.defaultCategory" has an unknown diagnostic category: "${
+                       defaultCategory}".
+
+Allowed diagnostic categories are:
+${allowedCategoryLabels.join('\n')}
+      `.trim(),
+    });
+  }
+
+  const allExtendedDiagnosticNames =
+      ALL_DIAGNOSTIC_FACTORIES.map((factory) => factory.name) as string[];
+  for (const [checkName, category] of Object.entries(options.extendedDiagnostics?.checks ?? {})) {
+    if (!allExtendedDiagnosticNames.includes(checkName)) {
+      yield makeConfigDiagnostic({
+        category: ts.DiagnosticCategory.Error,
+        code: ErrorCode.CONFIG_EXTENDED_DIAGNOSTICS_UNKNOWN_CHECK,
+        messageText: `
+Angular compiler option "extendedDiagnostics.checks" has an unknown check: "${checkName}".
+
+Allowed check names are:
+${allExtendedDiagnosticNames.join('\n')}
+        `.trim(),
+      });
+    }
+
+    if (!allowedCategoryLabels.includes(category)) {
+      yield makeConfigDiagnostic({
+        category: ts.DiagnosticCategory.Error,
+        code: ErrorCode.CONFIG_EXTENDED_DIAGNOSTICS_UNKNOWN_CATEGORY_LABEL,
+        messageText: `
+Angular compiler option "extendedDiagnostics.checks['${
+                         checkName}']" has an unknown diagnostic category: "${category}".
+
+Allowed diagnostic categories are:
+${allowedCategoryLabels.join('\n')}
+        `.trim(),
+      });
+    }
+  }
+}
+
+function makeConfigDiagnostic({category, code, messageText}: {
+  category: ts.DiagnosticCategory,
+  code: ErrorCode,
+  messageText: string,
+}): ts.Diagnostic {
+  return {
+    category,
+    code: ngErrorCode(code),
+    file: undefined,
+    start: undefined,
+    length: undefined,
+    messageText,
+  };
 }
 
 class ReferenceGraphAdapter implements ReferencesRegistry {

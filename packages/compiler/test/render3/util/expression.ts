@@ -7,6 +7,7 @@
  */
 
 import {AbsoluteSourceSpan} from '@angular/compiler';
+
 import * as e from '../../../src/expression_parser/ast';
 import * as t from '../../../src/render3/r3_ast';
 import {unparse} from '../../expression_parser/utils/unparser';
@@ -46,10 +47,6 @@ class ExpressionSourceHumanizer extends e.RecursiveAstVisitor implements t.Visit
     this.recordAst(ast);
     super.visitConditional(ast, null);
   }
-  override visitFunctionCall(ast: e.FunctionCall) {
-    this.recordAst(ast);
-    super.visitFunctionCall(ast, null);
-  }
   override visitImplicitReceiver(ast: e.ImplicitReceiver) {
     this.recordAst(ast);
     super.visitImplicitReceiver(ast, null);
@@ -78,10 +75,6 @@ class ExpressionSourceHumanizer extends e.RecursiveAstVisitor implements t.Visit
     this.recordAst(ast);
     super.visitLiteralMap(ast, null);
   }
-  override visitMethodCall(ast: e.MethodCall) {
-    this.recordAst(ast);
-    super.visitMethodCall(ast, null);
-  }
   override visitNonNullAssert(ast: e.NonNullAssert) {
     this.recordAst(ast);
     super.visitNonNullAssert(ast, null);
@@ -102,21 +95,21 @@ class ExpressionSourceHumanizer extends e.RecursiveAstVisitor implements t.Visit
     this.recordAst(ast);
     super.visitPropertyWrite(ast, null);
   }
-  override visitSafeMethodCall(ast: e.SafeMethodCall) {
-    this.recordAst(ast);
-    super.visitSafeMethodCall(ast, null);
-  }
   override visitSafePropertyRead(ast: e.SafePropertyRead) {
     this.recordAst(ast);
     super.visitSafePropertyRead(ast, null);
   }
-  override visitQuote(ast: e.Quote) {
-    this.recordAst(ast);
-    super.visitQuote(ast, null);
-  }
   override visitSafeKeyedRead(ast: e.SafeKeyedRead) {
     this.recordAst(ast);
     super.visitSafeKeyedRead(ast, null);
+  }
+  override visitCall(ast: e.Call) {
+    this.recordAst(ast);
+    super.visitCall(ast, null);
+  }
+  override visitSafeCall(ast: e.SafeCall) {
+    this.recordAst(ast);
+    super.visitSafeCall(ast, null);
   }
 
   visitTemplate(ast: t.Template) {

@@ -6,10 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {BoundTarget, ParseError, ParseSourceFile, R3TargetBinder, SchemaMetadata, TemplateParseError, TmplAstNode} from '@angular/compiler';
-import {ErrorCode, ngErrorCode} from '@angular/compiler-cli/src/ngtsc/diagnostics';
-import * as ts from 'typescript';
+import {BoundTarget, ParseError, ParseSourceFile, R3TargetBinder, SchemaMetadata, TmplAstNode} from '@angular/compiler';
+import ts from 'typescript';
 
+import {ErrorCode, ngErrorCode} from '../../../../src/ngtsc/diagnostics';
 import {absoluteFromSourceFile, AbsoluteFsPath} from '../../file_system';
 import {NoopImportRewriter, Reference, ReferenceEmitter} from '../../imports';
 import {PerfEvent, PerfRecorder} from '../../perf';
@@ -210,7 +210,7 @@ export class TypeCheckContextImpl implements TypeCheckContext {
       binder: R3TargetBinder<TypeCheckableDirectiveMeta>, template: TmplAstNode[],
       pipes: Map<string, Reference<ClassDeclaration<ts.ClassDeclaration>>>,
       schemas: SchemaMetadata[], sourceMapping: TemplateSourceMapping, file: ParseSourceFile,
-      parseErrors: ParseError[]|null): void {
+      parseErrors: ParseError[]|null, isStandalone: boolean): void {
     if (!this.host.shouldCheckComponent(ref.node)) {
       return;
     }
@@ -235,7 +235,7 @@ export class TypeCheckContextImpl implements TypeCheckContext {
         const dirRef = dir.ref as Reference<ClassDeclaration<ts.ClassDeclaration>>;
         const dirNode = dirRef.node;
 
-        if (!dir.isGeneric || !requiresInlineTypeCtor(dirNode, this.reflector)) {
+        if (!dir.isGeneric || !requiresInlineTypeCtor(dirNode, this.reflector, shimData.file)) {
           // inlining not required
           continue;
         }
@@ -263,7 +263,16 @@ export class TypeCheckContextImpl implements TypeCheckContext {
       templateDiagnostics,
     });
 
-    const inliningRequirement = requiresInlineTypeCheckBlock(ref.node, pipes, this.reflector);
+    const usedPipes: Reference<ClassDeclaration<ts.ClassDeclaration>>[] = [];
+    for (const name of boundTarget.getUsedPipes()) {
+      if (!pipes.has(name)) {
+        continue;
+      }
+      usedPipes.push(pipes.get(name)!);
+    }
+
+    const inliningRequirement =
+        requiresInlineTypeCheckBlock(ref, shimData.file, usedPipes, this.reflector);
 
     // If inlining is not supported, but is required for either the TCB or one of its directive
     // dependencies, then exit here with an error.
@@ -285,6 +294,7 @@ export class TypeCheckContextImpl implements TypeCheckContext {
       boundTarget,
       pipes,
       schemas,
+      isStandalone
     };
     this.perf.eventCount(PerfEvent.GenerateTcb);
     if (inliningRequirement !== TcbInliningRequirement.None &&
@@ -358,7 +368,7 @@ export class TypeCheckContextImpl implements TypeCheckContext {
     // Use a `ts.Printer` to generate source code.
     const printer = ts.createPrinter({omitTrailingSemicolon: true});
 
-    // Begin with the intial section of the code text.
+    // Begin with the initial section of the code text.
     let code = textParts[0];
 
     // Process each operation and use the printer to generate source code for it, inserting it into
@@ -523,7 +533,7 @@ class InlineTcbOp implements Op {
   execute(im: ImportManager, sf: ts.SourceFile, refEmitter: ReferenceEmitter, printer: ts.Printer):
       string {
     const env = new Environment(this.config, im, refEmitter, this.reflector, sf);
-    const fnName = ts.createIdentifier(`_tcb_${this.ref.node.pos}`);
+    const fnName = ts.factory.createIdentifier(`_tcb_${this.ref.node.pos}`);
 
     // Inline TCBs should copy any generic type parameter nodes directly, as the TCB code is inlined
     // into the class in a context where that will always be legal.

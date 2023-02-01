@@ -8,7 +8,7 @@
 
 /// <reference types="node" />
 
-import * as cluster from 'cluster';
+import cluster from 'cluster';
 
 import {MessageFromWorker, MessageToWorker} from './api';
 
@@ -74,9 +74,9 @@ export const sendMessageToWorker = (workerId: number, msg: MessageToWorker): Pro
     throw new Error('Unable to send message to worker process: Sender is not the master process.');
   }
 
-  const worker = cluster.workers[workerId];
+  const worker = cluster.workers?.[workerId];
 
-  if ((worker === undefined) || worker.isDead() || !worker.isConnected()) {
+  if (worker === undefined || worker.isDead() || !worker.isConnected()) {
     throw new Error(
         'Unable to send message to worker process: Recipient does not exist or has disconnected.');
   }

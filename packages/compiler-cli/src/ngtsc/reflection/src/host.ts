@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 /**
  * Metadata extracted from an instance of a decorator on another declaration, or synthesized from
@@ -28,11 +28,11 @@ export interface BaseDecorator {
    */
   identifier: DecoratorIdentifier|null;
 
-/**
- * `Import` by which the decorator was brought into the module in which it was invoked, or `null`
- * if the decorator was declared in the same module and not imported.
- */
-import: Import|null;
+  /**
+   * `Import` by which the decorator was brought into the module in which it was invoked, or `null`
+   * if the decorator was declared in the same module and not imported.
+   */
+  import: Import|null;
 
   /**
    * TypeScript reference to the decorator itself, or `null` if the decorator is synthesized (e.g.
@@ -342,7 +342,7 @@ export interface NoValueDeclaration {
 export interface TypeOnlyImport {
   kind: ValueUnavailableKind.TYPE_ONLY_IMPORT;
   typeNode: ts.TypeNode;
-  importClause: ts.ImportClause;
+  node: ts.ImportClause|ts.ImportSpecifier;
 }
 
 export interface NamespaceImport {
@@ -724,7 +724,7 @@ export interface ReflectionHost {
    * Determine if an identifier was imported from another module and return `Import` metadata
    * describing its origin.
    *
-   * @param id a TypeScript `ts.Identifer` to reflect.
+   * @param id a TypeScript `ts.Identifier` to reflect.
    *
    * @returns metadata about the `Import` if the identifier was imported from another module, or
    * `null` if the identifier doesn't resolve to an import but instead is locally defined.
@@ -858,12 +858,12 @@ export interface ReflectionHost {
   getAdjacentNameOfClass(clazz: ClassDeclaration): ts.Identifier;
 
   /**
-   * Returns `true` if a class is exported from the module in which it's defined.
+   * Returns `true` if a declaration is exported from the module in which it's defined.
    *
-   * Not all mechanisms by which a class is exported can be statically detected, especially when
-   * processing already compiled JavaScript. A `false` result does not indicate that the class is
-   * never visible outside its module, only that it was not exported via one of the export
-   * mechanisms that the `ReflectionHost` is capable of statically checking.
+   * Not all mechanisms by which a declaration is exported can be statically detected, especially
+   * when processing already compiled JavaScript. A `false` result does not indicate that the
+   * declaration is never visible outside its module, only that it was not exported via one of the
+   * export mechanisms that the `ReflectionHost` is capable of statically checking.
    */
-  isStaticallyExported(clazz: ClassDeclaration): boolean;
+  isStaticallyExported(decl: ts.Node): boolean;
 }

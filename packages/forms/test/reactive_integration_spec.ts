@@ -7,9 +7,9 @@
  */
 
 import {ɵgetDOM as getDOM} from '@angular/common';
-import {Component, Directive, forwardRef, Input, NgModule, OnDestroy, Type} from '@angular/core';
+import {Component, Directive, ElementRef, forwardRef, Input, NgModule, OnDestroy, Type, ViewChild} from '@angular/core';
 import {ComponentFixture, fakeAsync, TestBed, tick} from '@angular/core/testing';
-import {AbstractControl, AsyncValidator, AsyncValidatorFn, COMPOSITION_BUFFER_MODE, ControlValueAccessor, DefaultValueAccessor, FormArray, FormControl, FormControlDirective, FormControlName, FormGroup, FormGroupDirective, FormsModule, MaxValidator, MinLengthValidator, MinValidator, NG_ASYNC_VALIDATORS, NG_VALIDATORS, NG_VALUE_ACCESSOR, ReactiveFormsModule, Validator, Validators} from '@angular/forms';
+import {AbstractControl, AsyncValidator, AsyncValidatorFn, COMPOSITION_BUFFER_MODE, ControlValueAccessor, DefaultValueAccessor, FormArray, FormBuilder, FormControl, FormControlDirective, FormControlName, FormGroup, FormGroupDirective, FormsModule, MaxValidator, MinLengthValidator, MinValidator, NG_ASYNC_VALIDATORS, NG_VALIDATORS, NG_VALUE_ACCESSOR, ReactiveFormsModule, Validator, Validators} from '@angular/forms';
 import {By} from '@angular/platform-browser/src/dom/debug/by';
 import {dispatchEvent, sortedClassList} from '@angular/platform-browser/testing/src/browser_util';
 import {merge, NEVER, of, Subscription, timer} from 'rxjs';
@@ -261,7 +261,7 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
 
       it('should strip named controls that are not found', () => {
         const fixture = initTest(NestedFormGroupNameComp, LoginIsEmptyValidator);
-        const form = new FormGroup({
+        const form: FormGroup = new FormGroup({
           'signin': new FormGroup({'login': new FormControl(''), 'password': new FormControl('')})
         });
         fixture.componentInstance.form = form;
@@ -309,9 +309,45 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
         expect(inputs[2]).not.toBeDefined();
       });
 
+      it('should sync the disabled state if it changes right after a group is re-bound', () => {
+        @Component({
+          template: `
+            <form [formGroup]="form">
+              <input formControlName="input">
+            </form>
+          `
+        })
+        class App {
+          form: FormGroup;
+
+          constructor(private _fb: FormBuilder) {
+            this.form = this._getForm();
+          }
+
+          private _getForm() {
+            return this._fb.group({'input': 'value'});
+          }
+
+          recreateAndDisable() {
+            this.form = this._getForm();
+            this.form.disable();
+          }
+        }
+
+        const fixture = initTest(App);
+        fixture.detectChanges();
+
+        const input = fixture.nativeElement.querySelector('input');
+        expect(input.disabled).toBe(false);
+
+        fixture.componentInstance.recreateAndDisable();
+        fixture.detectChanges();
+        expect(input.disabled).toBe(true);
+      });
+
       describe('nested control rebinding', () => {
         it('should attach dir to control when leaf control changes', () => {
-          const form = new FormGroup({'login': new FormControl('oldValue')});
+          const form: FormGroup = new FormGroup({'login': new FormControl('oldValue')});
           const fixture = initTest(FormGroupComp);
           fixture.componentInstance.form = form;
           fixture.detectChanges();
@@ -336,7 +372,7 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
 
         it('should attach dirs to all child controls when group control changes', () => {
           const fixture = initTest(NestedFormGroupNameComp, LoginIsEmptyValidator);
-          const form = new FormGroup({
+          const form: FormGroup = new FormGroup({
             signin: new FormGroup(
                 {login: new FormControl('oldLogin'), password: new FormControl('oldPassword')})
           });
@@ -369,7 +405,7 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
         it('should attach dirs to all present child controls when array control changes', () => {
           const fixture = initTest(FormArrayComp);
           const cityArray = new FormArray([new FormControl('SF'), new FormControl('NY')]);
-          const form = new FormGroup({cities: cityArray});
+          const form: FormGroup = new FormGroup({cities: cityArray});
           fixture.componentInstance.form = form;
           fixture.componentInstance.cityArray = cityArray;
           fixture.detectChanges();
@@ -1458,7 +1494,7 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
           class App implements OnDestroy {
             private _subscription: Subscription;
 
-            form = new FormGroup({
+            form: FormGroup = new FormGroup({
               name: new FormControl('Frodo'),
               surname: new FormControl('Baggins'),
             });
@@ -1490,7 +1526,8 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
 
         it('should not emit valueChanges or statusChanges until blur', () => {
           const fixture = initTest(FormControlComp);
-          const control = new FormControl('', {validators: Validators.required, updateOn: 'blur'});
+          const control: FormControl =
+              new FormControl('', {validators: Validators.required, updateOn: 'blur'});
           fixture.componentInstance.control = control;
           fixture.detectChanges();
           const values: string[] = [];
@@ -1516,7 +1553,8 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
 
         it('should not emit valueChanges or statusChanges on blur if value unchanged', () => {
           const fixture = initTest(FormControlComp);
-          const control = new FormControl('', {validators: Validators.required, updateOn: 'blur'});
+          const control: FormControl =
+              new FormControl('', {validators: Validators.required, updateOn: 'blur'});
           fixture.componentInstance.control = control;
           fixture.detectChanges();
           const values: string[] = [];
@@ -1890,7 +1928,7 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
           fixture.componentInstance.form = formGroup;
           fixture.detectChanges();
 
-          const values: (string|{[key: string]: string})[] = [];
+          const values: any[] = [];
           const streams = merge(
               control.valueChanges, control.statusChanges, formGroup.valueChanges,
               formGroup.statusChanges);
@@ -2076,6 +2114,20 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
           expect(passwordControl.value).toEqual('Carson', 'Expected value to change on submit.');
           expect(passwordControl.valid).toBe(true, 'Expected validation to run on submit.');
         });
+
+        it('should not prevent the default action on forms with method="dialog"', fakeAsync(() => {
+             if (typeof HTMLDialogElement === 'undefined') {
+               return;
+             }
+
+             const fixture = initTest(NativeDialogForm);
+             fixture.detectChanges();
+             tick();
+             const event = dispatchEvent(fixture.componentInstance.form.nativeElement, 'submit');
+             fixture.detectChanges();
+
+             expect(event.defaultPrevented).toBe(false);
+           }));
       });
     });
 
@@ -2266,6 +2318,21 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
 
         expect(checkbox.nativeElement.checked).toBe(true);
         expect(control.hasError('required')).toEqual(false);
+
+        checkbox.nativeElement.required = false;
+        dispatchEvent(checkbox.nativeElement, 'change');
+        fixture.detectChanges();
+
+        expect(checkbox.nativeElement.checked).toBe(true);
+        expect(control.hasError('required')).toEqual(false);
+
+        checkbox.nativeElement.checked = false;
+        checkbox.nativeElement.required = true;
+        dispatchEvent(checkbox.nativeElement, 'change');
+        fixture.detectChanges();
+
+        expect(checkbox.nativeElement.checked).toBe(false);
+        expect(control.hasError('required')).toEqual(true);
       });
 
       // Note: this scenario goes against validator function rules were `null` is the only
@@ -2751,6 +2818,95 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
           setInputValue(123);
           setValidatorValues({minlength: null, maxlength: null});
           verifyValidatorAttrValues({minlength: null, maxlength: null});
+          verifyFormState({isValid: true});
+        });
+
+        it('should not activate min and max validators if input is null', () => {
+          @Component({
+            selector: 'min-max-null',
+            template: `
+                <form [formGroup]="form">
+                  <input type="number" [formControl]="control" name="minmaxinput" [min]="minlen" [max]="maxlen">
+                </form> `
+          })
+          class MinMaxComponent {
+            control: FormControl = new FormControl();
+            form: FormGroup = new FormGroup({'control': this.control});
+            minlen: number|null = null;
+            maxlen: number|null = null;
+          }
+
+          const fixture = initTest(MinMaxComponent);
+          const control = fixture.componentInstance.control;
+          fixture.detectChanges();
+
+          const form = fixture.componentInstance.form;
+          const input = fixture.debugElement.query(By.css('input')).nativeElement;
+
+          interface minmax {
+            min: number|null;
+            max: number|null;
+          }
+
+          interface state {
+            isValid: boolean;
+            failedValidator?: string;
+          }
+
+          const setInputValue = (value: number) => {
+            input.value = value;
+            dispatchEvent(input, 'input');
+            fixture.detectChanges();
+          };
+          const setValidatorValues = (values: minmax) => {
+            fixture.componentInstance.minlen = values.min;
+            fixture.componentInstance.maxlen = values.max;
+            fixture.detectChanges();
+          };
+          const verifyValidatorAttrValues = (values: {min: any, max: any}) => {
+            expect(input.getAttribute('min')).toBe(values.min);
+            expect(input.getAttribute('max')).toBe(values.max);
+          };
+          const verifyFormState = (state: state) => {
+            expect(form.valid).toBe(state.isValid);
+            if (state.failedValidator) {
+              expect(control!.hasError('min')).toEqual(state.failedValidator === 'min');
+              expect(control!.hasError('max')).toEqual(state.failedValidator === 'max');
+            }
+          };
+
+          ////////// Actual test scenarios start below //////////
+          // 1. Verify that validators are disabled when input is `null`.
+          setValidatorValues({min: null, max: null});
+          verifyValidatorAttrValues({min: null, max: null});
+          verifyFormState({isValid: true});
+
+          // 2. Verify that setting validator inputs (to a value different from `null`) activate
+          // validators.
+          setInputValue(12345);
+          setValidatorValues({min: 2, max: 4});
+          verifyValidatorAttrValues({min: '2', max: '4'});
+          verifyFormState({isValid: false, failedValidator: 'max'});
+
+          // 3. Changing value to the valid range should make the form valid.
+          setInputValue(3);
+          verifyFormState({isValid: true});
+
+          // 4. Changing value to trigger `minlength` validator.
+          setInputValue(1);
+          verifyFormState({isValid: false, failedValidator: 'min'});
+
+          // 5. Changing validator inputs to verify that attribute values are updated (and the form
+          // is now valid).
+          setInputValue(1);
+          setValidatorValues({min: 1, max: 5});
+          verifyValidatorAttrValues({min: '1', max: '5'});
+          verifyFormState({isValid: true});
+
+          // 6. Reset validator inputs back to `null` should deactivate validators.
+          setInputValue(123);
+          setValidatorValues({min: null, max: null});
+          verifyValidatorAttrValues({min: null, max: null});
           verifyFormState({isValid: true});
         });
       });
@@ -3352,7 +3508,7 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
         const inputNativeEl = inputEl.nativeElement;
         expect(inputNativeEl.value).toEqual('oldValue');
 
-        inputEl.triggerEventHandler('compositionstart', null);
+        inputEl.triggerEventHandler('compositionstart');
 
         inputNativeEl.value = 'updatedValue';
         dispatchEvent(inputNativeEl, 'input');
@@ -3383,7 +3539,7 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
         const inputNativeEl = inputEl.nativeElement;
         expect(inputNativeEl.value).toEqual('oldValue');
 
-        inputEl.triggerEventHandler('compositionstart', null);
+        inputEl.triggerEventHandler('compositionstart');
 
         inputNativeEl.value = 'updatedValue';
         dispatchEvent(inputNativeEl, 'input');
@@ -3411,7 +3567,7 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
         const inputNativeEl = inputEl.nativeElement;
         expect(inputNativeEl.value).toEqual('oldValue');
 
-        inputEl.triggerEventHandler('compositionstart', null);
+        inputEl.triggerEventHandler('compositionstart');
 
         inputNativeEl.value = 'updatedValue';
         dispatchEvent(inputNativeEl, 'input');
@@ -4937,7 +5093,9 @@ const ValueAccessorB = createControlValueAccessor('[cva-b]');
         const fixture = initTest(NoCVAComponent);
         expect(() => {
           fixture.detectChanges();
-        }).toThrowError('No value accessor for form control with name: \'control\'');
+        })
+            .toThrowError(
+                `NG01203: No value accessor for form control name: 'control'. Find more at https://angular.io/errors/NG01203`);
 
         // Making sure that cleanup between tests doesn't cause any issues
         // for not fully initialized controls.
@@ -5233,7 +5391,7 @@ class FormControlWithAsyncValidatorFn {
   `
 })
 class FormControlWithValidators {
-  form = new FormGroup({login: new FormControl('INITIAL')});
+  form: FormGroup = new FormGroup({login: new FormControl('INITIAL')});
 }
 
 @Component({
@@ -5264,7 +5422,7 @@ class MultipleFormControls {
   `
 })
 class NgForFormControlWithValidators {
-  form = new FormGroup({login: new FormControl('a')});
+  form: FormGroup = new FormGroup({login: new FormControl('a')});
   logins = ['a', 'b', 'c'];
 }
 
@@ -5294,4 +5452,18 @@ class MinMaxFormControlComp {
   form!: FormGroup;
   min: number|string = 1;
   max: number|string = 10;
+}
+
+@Component({
+  template: `
+    <dialog open>
+      <form #form method="dialog" [formGroup]="formGroup">
+        <button>Submit</button>
+      </form>
+    </dialog>
+  `
+})
+class NativeDialogForm {
+  @ViewChild('form') form!: ElementRef<HTMLFormElement>;
+  formGroup = new FormGroup({});
 }

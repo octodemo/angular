@@ -8,9 +8,10 @@
 import '../../util/ng_dev_mode';
 import '../../util/ng_i18n_closure_mode';
 
-import {getTemplateContent, SRCSET_ATTRS, URI_ATTRS, VALID_ATTRS, VALID_ELEMENTS} from '../../sanitization/html_sanitizer';
+import {XSS_SECURITY_URL} from '../../error_details_base_url';
+import {getTemplateContent, URI_ATTRS, VALID_ATTRS, VALID_ELEMENTS} from '../../sanitization/html_sanitizer';
 import {getInertBodyHelper} from '../../sanitization/inert_body';
-import {_sanitizeUrl, sanitizeSrcset} from '../../sanitization/url_sanitizer';
+import {_sanitizeUrl} from '../../sanitization/url_sanitizer';
 import {assertDefined, assertEqual, assertGreaterThanOrEqual, assertOneOf, assertString} from '../../util/assert';
 import {CharCode} from '../../util/char_code';
 import {loadIcuContainerVisitor} from '../instructions/i18n_icu_container_visitor';
@@ -21,7 +22,6 @@ import {TNode, TNodeType} from '../interfaces/node';
 import {SanitizerFn} from '../interfaces/sanitization';
 import {HEADER_OFFSET, LView, TView} from '../interfaces/view';
 import {getCurrentParentTNode, getCurrentTNode, setCurrentTNode} from '../state';
-import {attachDebugGetter} from '../util/debug_utils';
 
 import {i18nCreateOpCodesToString, i18nRemoveOpCodesToString, i18nUpdateOpCodesToString, icuCreateOpCodesToString} from './i18n_debug';
 import {addTNodeAndUpdateInsertBeforeIndex} from './i18n_insert_before_index';
@@ -49,6 +49,23 @@ const PH_REGEXP = /�(\/?[#*]\d+):?\d*�/gi;
 const NGSP_UNICODE_REGEXP = /\uE500/g;
 function replaceNgsp(value: string): string {
   return value.replace(NGSP_UNICODE_REGEXP, ' ');
+}
+
+/**
+ * Patch a `debug` property getter on top of the existing object.
+ *
+ * NOTE: always call this method with `ngDevMode && attachDebugObject(...)`
+ *
+ * @param obj Object to patch
+ * @param debugGetter Getter returning a value to patch
+ */
+function attachDebugGetter<T>(obj: T, debugGetter: (this: T) => any): void {
+  if (ngDevMode) {
+    Object.defineProperty(obj, 'debug', {get: debugGetter, enumerable: false});
+  } else {
+    throw new Error(
+        'This method should be guarded with `ngDevMode` so that it can be tree shaken in production!');
+  }
 }
 
 /**
@@ -141,7 +158,7 @@ export function i18nStartFirstCreatePass(
 }
 
 /**
- * Allocate space in i18n Range add create OpCode instruction to crete a text or comment node.
+ * Allocate space in i18n Range add create OpCode instruction to create a text or comment node.
  *
  * @param tView Current `TView` needed to allocate space in i18n range.
  * @param rootTNode Root `TNode` of the i18n block. This node determines if the new TNode will be
@@ -384,7 +401,7 @@ function removeInnerTemplateTranslation(message: string): string {
           `Tag mismatch: unable to find the end of the sub-template in the translation "${
               message}"`);
 
-  res += message.substr(index);
+  res += message.slice(index);
   return res;
 }
 
@@ -483,7 +500,7 @@ export function parseICUBlock(pattern: string): IcuExpression {
     } else {
       icuType = IcuType.plural;
     }
-    mainBinding = parseInt(binding.substr(1), 10);
+    mainBinding = parseInt(binding.slice(1), 10);
     return '';
   });
 
@@ -624,9 +641,6 @@ function walkIcuTree(
                 if (URI_ATTRS[lowerAttrName]) {
                   generateBindingUpdateOpCodes(
                       update, attr.value, newIndex, attr.name, 0, _sanitizeUrl);
-                } else if (SRCSET_ATTRS[lowerAttrName]) {
-                  generateBindingUpdateOpCodes(
-                      update, attr.value, newIndex, attr.name, 0, sanitizeSrcset);
                 } else {
                   generateBindingUpdateOpCodes(update, attr.value, newIndex, attr.name, 0, null);
                 }
@@ -635,7 +649,7 @@ function walkIcuTree(
                     console.warn(
                         `WARNING: ignoring unsafe attribute value ` +
                         `${lowerAttrName} on element ${tagName} ` +
-                        `(see https://g.co/ng/security#xss)`);
+                        `(see ${XSS_SECURITY_URL})`);
               }
             } else {
               addCreateAttribute(create, newIndex, attr);

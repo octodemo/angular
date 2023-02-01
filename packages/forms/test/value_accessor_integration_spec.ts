@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Component, Directive, EventEmitter, Input, Output, Type, ViewChild} from '@angular/core';
+import {ChangeDetectionStrategy, ChangeDetectorRef, Component, Directive, EventEmitter, Input, Output, Type, ViewChild} from '@angular/core';
 import {ComponentFixture, fakeAsync, TestBed, tick, waitForAsync} from '@angular/core/testing';
 import {AbstractControl, ControlValueAccessor, FormControl, FormGroup, FormsModule, NG_VALIDATORS, NG_VALUE_ACCESSOR, NgControl, NgForm, NgModel, ReactiveFormsModule, Validators} from '@angular/forms';
 import {By} from '@angular/platform-browser/src/dom/debug/by';
@@ -508,7 +508,7 @@ import {dispatchEvent} from '@angular/platform-browser/testing/src/browser_util'
 
              selectOptionViaUI('1: Object');
              assertOptionElementSelectedState([false, true, false]);
-             expect(spy.calls.count()).toBe(2);
+             expect(spy).toHaveBeenCalled();
            }));
 
         it('should reflect state of model after option selected and new options subsequently added',
@@ -621,7 +621,7 @@ import {dispatchEvent} from '@angular/platform-browser/testing/src/browser_util'
 
         it('should properly set value to null and undefined', () => {
           const fixture = initTest(FormControlRadioButtons);
-          const form = new FormGroup(
+          const form: FormGroup = new FormGroup(
               {'food': new FormControl('chicken'), 'drink': new FormControl('sprite')});
           fixture.componentInstance.form = form;
           fixture.detectChanges();
@@ -675,7 +675,7 @@ import {dispatchEvent} from '@angular/platform-browser/testing/src/browser_util'
         it('should support removing controls from <type=radio>', () => {
           const fixture = initTest(FormControlRadioButtons);
           const showRadio = new FormControl('yes');
-          const form =
+          const form: FormGroup =
               new FormGroup({'food': new FormControl('fish'), 'drink': new FormControl('sprite')});
           fixture.componentInstance.form = form;
           fixture.componentInstance.showRadio = showRadio;
@@ -1066,6 +1066,40 @@ import {dispatchEvent} from '@angular/platform-browser/testing/src/browser_util'
              expect(fixture.componentInstance.control.status).toEqual('DISABLED');
            });
 
+        describe('should support custom accessors with setDisabledState - formControlName', () => {
+          let fixture: ComponentFixture<CvaWithDisabledStateForm>;
+
+          beforeEach(() => {
+            fixture = initTest(CvaWithDisabledStateForm, CvaWithDisabledState);
+          });
+
+          it('sets the disabled state when the control is initally disabled', () => {
+            fixture.componentInstance.form = new FormGroup({
+              'login': new FormControl({value: 'aa', disabled: true}),
+            });
+            fixture.detectChanges();
+
+            expect(fixture.componentInstance.form.status).toEqual('DISABLED');
+            expect(fixture.componentInstance.form.get('login')!.status).toEqual('DISABLED');
+            expect(fixture.debugElement.query(By.directive(CvaWithDisabledState))
+                       .nativeElement.textContent)
+                .toContain('DISABLED');
+          });
+
+          it('sets the enabled state when the control is initally enabled', () => {
+            fixture.componentInstance.form = new FormGroup({
+              'login': new FormControl({value: 'aa', disabled: false}),
+            });
+            fixture.detectChanges();
+
+            expect(fixture.componentInstance.form.status).toEqual('VALID');
+            expect(fixture.componentInstance.form.get('login')!.status).toEqual('VALID');
+            expect(fixture.debugElement.query(By.directive(CvaWithDisabledState))
+                       .nativeElement.textContent)
+                .toContain('ENABLED');
+          });
+        });
+
         it('should populate control in ngOnInit when injecting NgControl', () => {
           const fixture = initTest(MyInputForm, MyInput);
           fixture.componentInstance.form = new FormGroup({'login': new FormControl('aa')});
@@ -1099,9 +1133,101 @@ import {dispatchEvent} from '@angular/platform-browser/testing/src/browser_util'
              });
            }));
       });
+
+      describe('`ngModel` value accessor inside an OnPush component', () => {
+        it('should run change detection and update the value', fakeAsync(async () => {
+             @Component({
+               selector: 'parent',
+               template: '<child [ngModel]="value"></child>',
+               changeDetection: ChangeDetectionStrategy.OnPush,
+             })
+             class Parent {
+               value!: string;
+
+               constructor(private ref: ChangeDetectorRef) {}
+
+               setTimeoutAndChangeValue(): void {
+                 setTimeout(() => {
+                   this.value = 'Carson';
+                   this.ref.detectChanges();
+                 }, 50);
+               }
+             }
+
+             @Component({
+               selector: 'child',
+               template: 'Value: {{ value }}',
+               providers: [{provide: NG_VALUE_ACCESSOR, useExisting: Child, multi: true}]
+             })
+             class Child implements ControlValueAccessor {
+               value!: string;
+
+               writeValue(value: string): void {
+                 this.value = value;
+               }
+
+               registerOnChange(): void {}
+
+               registerOnTouched(): void {}
+             }
+
+             const fixture = initTest(Parent, Child);
+             fixture.componentInstance.value = 'Nancy';
+             fixture.detectChanges();
+
+             await fixture.whenStable();
+             fixture.detectChanges();
+             await fixture.whenStable();
+
+             const child = fixture.debugElement.query(By.css('child'));
+             // Let's ensure that the initial value has been set, because previously
+             // it wasn't set inside an `OnPush` component.
+             expect(child.nativeElement.innerHTML).toEqual('Value: Nancy');
+
+             fixture.componentInstance.setTimeoutAndChangeValue();
+             tick(50);
+
+             fixture.detectChanges();
+             await fixture.whenStable();
+
+             expect(child.nativeElement.innerHTML).toEqual('Value: Carson');
+           }));
+      });
     });
   });
 }
+
+
+describe('value accessors in reactive forms with custom options', () => {
+  function initTest<T>(component: Type<T>, ...directives: Type<any>[]): ComponentFixture<T> {
+    TestBed.configureTestingModule({
+      declarations: [component, ...directives],
+      imports: [ReactiveFormsModule.withConfig({callSetDisabledState: 'whenDisabledForLegacyCode'})]
+    });
+    return TestBed.createComponent(component);
+  }
+
+  describe('should support custom accessors with setDisabledState', () => {
+    let fixture: ComponentFixture<CvaWithDisabledStateForm>;
+
+    beforeEach(() => {
+      fixture = initTest(CvaWithDisabledStateForm, CvaWithDisabledState);
+    });
+
+    it('does not set the enabled state when the control is initally enabled', () => {
+      fixture.componentInstance.form = new FormGroup({
+        'login': new FormControl({value: 'aa', disabled: false}),
+      });
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.form.status).toEqual('VALID');
+      expect(fixture.componentInstance.form.get('login')!.status).toEqual('VALID');
+      expect(
+          fixture.debugElement.query(By.directive(CvaWithDisabledState)).nativeElement.textContent)
+          .toContain('UNSET');
+    });
+  });
+});
 
 @Component({selector: 'form-control-comp', template: `<input type="text" [formControl]="control">`})
 export class FormControlComp {
@@ -1377,6 +1503,41 @@ class WrappedValue implements ControlValueAccessor {
   validate(c: AbstractControl) {
     return c.value === 'expected' ? null : {'err': true};
   }
+}
+
+@Component({
+  selector: 'cva-with-disabled-state',
+  template: `
+    <div *ngIf="disabled !== undefined">CALLED WITH {{disabled ? 'DISABLED' : 'ENABLED'}}</div>
+    <div *ngIf="disabled === undefined">UNSET</div>
+  `,
+  providers: [
+    {provide: NG_VALUE_ACCESSOR, multi: true, useExisting: CvaWithDisabledState},
+  ]
+})
+class CvaWithDisabledState implements ControlValueAccessor {
+  disabled?: boolean;
+  onChange!: Function;
+
+  writeValue(value: any) {}
+
+  registerOnChange(fn: (value: any) => void) {}
+  registerOnTouched(fn: any) {}
+
+  setDisabledState(disabled: boolean) {
+    this.disabled = disabled;
+  }
+}
+
+@Component({
+  selector: 'wrapped-value-form',
+  template: `
+    <div [formGroup]="form">
+      <cva-with-disabled-state formControlName="login"></cva-with-disabled-state>
+    </div>`
+})
+class CvaWithDisabledStateForm {
+  form!: FormGroup;
 }
 
 @Component({selector: 'my-input', template: ''})

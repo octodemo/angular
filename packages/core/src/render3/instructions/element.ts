@@ -9,21 +9,20 @@
 import {assertDefined, assertEqual, assertIndexInRange} from '../../util/assert';
 import {assertFirstCreatePass, assertHasParent} from '../assert';
 import {attachPatchData} from '../context_discovery';
-import {formatRuntimeError, RuntimeErrorCode} from '../error_code';
 import {registerPostOrderHooks} from '../hooks';
-import {hasClassInput, hasStyleInput, TAttributes, TElementNode, TNode, TNodeFlags, TNodeType} from '../interfaces/node';
+import {hasClassInput, hasStyleInput, TAttributes, TElementNode, TNodeFlags, TNodeType} from '../interfaces/node';
 import {RElement} from '../interfaces/renderer_dom';
 import {isContentQueryHost, isDirectiveHost} from '../interfaces/type_checks';
 import {HEADER_OFFSET, LView, RENDERER, TView} from '../interfaces/view';
 import {assertTNodeType} from '../node_assert';
-import {appendChild, createElementNode, writeDirectClass, writeDirectStyle} from '../node_manipulation';
+import {appendChild, createElementNode, setupStaticAttributes} from '../node_manipulation';
 import {decreaseElementDepthCount, getBindingIndex, getCurrentTNode, getElementDepthCount, getLView, getNamespace, getTView, increaseElementDepthCount, isCurrentTNodeParent, setCurrentTNode, setCurrentTNodeAsNotParent} from '../state';
 import {computeStaticStyling} from '../styling/static_styling';
-import {setUpAttributes} from '../util/attrs_utils';
 import {getConstant} from '../util/view_utils';
-import {setDirectiveInputsWhichShadowsStyling} from './property';
-import {createDirectivesInstances, executeContentQueries, getOrCreateTNode, matchingSchemas, resolveDirectives, saveResolvedLocalsInData} from './shared';
 
+import {validateElementIsKnown} from './element_validation';
+import {setDirectiveInputsWhichShadowsStyling} from './property';
+import {createDirectivesInstances, executeContentQueries, getOrCreateTNode, resolveDirectives, saveResolvedLocalsInData} from './shared';
 
 
 function elementStartFirstCreatePass(
@@ -38,7 +37,9 @@ function elementStartFirstCreatePass(
 
   const hasDirectives =
       resolveDirectives(tView, lView, tNode, getConstant<string[]>(tViewConsts, localRefsIndex));
-  ngDevMode && logUnknownElementError(tView, native, tNode, hasDirectives);
+  if (ngDevMode) {
+    validateElementIsKnown(native, lView, tNode.value, tView.schemas, hasDirectives);
+  }
 
   if (tNode.attrs !== null) {
     computeStaticStyling(tNode, tNode.attrs, false);
@@ -62,6 +63,7 @@ function elementStartFirstCreatePass(
  * @param name Name of the DOM Node
  * @param attrsIndex Index of the element's attributes in the `consts` array.
  * @param localRefsIndex Index of the element's local references in the `consts` array.
+ * @returns This function returns itself so that it may be chained.
  *
  * Attributes and localRefs are passed as an array of strings where elements with an even index
  * hold an attribute name and elements with an odd index hold an attribute value, ex.:
@@ -70,7 +72,8 @@ function elementStartFirstCreatePass(
  * @codeGenApi
  */
 export function ɵɵelementStart(
-    index: number, name: string, attrsIndex?: number|null, localRefsIndex?: number): void {
+    index: number, name: string, attrsIndex?: number|null,
+    localRefsIndex?: number): typeof ɵɵelementStart {
   const lView = getLView();
   const tView = getTView();
   const adjustedIndex = HEADER_OFFSET + index;
@@ -88,19 +91,7 @@ export function ɵɵelementStart(
           adjustedIndex, tView, lView, native, name, attrsIndex, localRefsIndex) :
       tView.data[adjustedIndex] as TElementNode;
   setCurrentTNode(tNode, true);
-
-  const mergedAttrs = tNode.mergedAttrs;
-  if (mergedAttrs !== null) {
-    setUpAttributes(renderer, native, mergedAttrs);
-  }
-  const classes = tNode.classes;
-  if (classes !== null) {
-    writeDirectClass(renderer, native, classes);
-  }
-  const styles = tNode.styles;
-  if (styles !== null) {
-    writeDirectStyle(renderer, native, styles);
-  }
+  setupStaticAttributes(renderer, native, tNode);
 
   if ((tNode.flags & TNodeFlags.isDetached) !== TNodeFlags.isDetached) {
     // In the i18n case, the translation may have removed this element, so only add it if it is not
@@ -124,14 +115,16 @@ export function ɵɵelementStart(
   if (localRefsIndex !== null) {
     saveResolvedLocalsInData(lView, tNode);
   }
+  return ɵɵelementStart;
 }
 
 /**
  * Mark the end of the element.
+ * @returns This function returns itself so that it may be chained.
  *
  * @codeGenApi
  */
-export function ɵɵelementEnd(): void {
+export function ɵɵelementEnd(): typeof ɵɵelementEnd {
   let currentTNode = getCurrentTNode()!;
   ngDevMode && assertDefined(currentTNode, 'No parent node to close.');
   if (isCurrentTNodeParent()) {
@@ -163,6 +156,7 @@ export function ɵɵelementEnd(): void {
   if (tNode.stylesWithoutHost != null && hasStyleInput(tNode)) {
     setDirectiveInputsWhichShadowsStyling(tView, tNode, getLView(), tNode.stylesWithoutHost, false);
   }
+  return ɵɵelementEnd;
 }
 
 /**
@@ -172,52 +166,14 @@ export function ɵɵelementEnd(): void {
  * @param name Name of the DOM Node
  * @param attrsIndex Index of the element's attributes in the `consts` array.
  * @param localRefsIndex Index of the element's local references in the `consts` array.
+ * @returns This function returns itself so that it may be chained.
  *
  * @codeGenApi
  */
 export function ɵɵelement(
-    index: number, name: string, attrsIndex?: number|null, localRefsIndex?: number): void {
+    index: number, name: string, attrsIndex?: number|null,
+    localRefsIndex?: number): typeof ɵɵelement {
   ɵɵelementStart(index, name, attrsIndex, localRefsIndex);
   ɵɵelementEnd();
-}
-
-function logUnknownElementError(
-    tView: TView, element: RElement, tNode: TNode, hasDirectives: boolean): void {
-  const schemas = tView.schemas;
-
-  // If `schemas` is set to `null`, that's an indication that this Component was compiled in AOT
-  // mode where this check happens at compile time. In JIT mode, `schemas` is always present and
-  // defined as an array (as an empty array in case `schemas` field is not defined) and we should
-  // execute the check below.
-  if (schemas === null) return;
-
-  const tagName = tNode.value;
-
-  // If the element matches any directive, it's considered as valid.
-  if (!hasDirectives && tagName !== null) {
-    // The element is unknown if it's an instance of HTMLUnknownElement or it isn't registered
-    // as a custom element. Note that unknown elements with a dash in their name won't be instances
-    // of HTMLUnknownElement in browsers that support web components.
-    const isUnknown =
-        // Note that we can't check for `typeof HTMLUnknownElement === 'function'`,
-        // because while most browsers return 'function', IE returns 'object'.
-        (typeof HTMLUnknownElement !== 'undefined' && HTMLUnknownElement &&
-         element instanceof HTMLUnknownElement) ||
-        (typeof customElements !== 'undefined' && tagName.indexOf('-') > -1 &&
-         !customElements.get(tagName));
-
-    if (isUnknown && !matchingSchemas(tView, tagName)) {
-      let message = `'${tagName}' is not a known element:\n`;
-      message += `1. If '${
-          tagName}' is an Angular component, then verify that it is part of this module.\n`;
-      if (tagName && tagName.indexOf('-') > -1) {
-        message += `2. If '${
-            tagName}' is a Web Component then add 'CUSTOM_ELEMENTS_SCHEMA' to the '@NgModule.schemas' of this component to suppress this message.`;
-      } else {
-        message +=
-            `2. To allow any element add 'NO_ERRORS_SCHEMA' to the '@NgModule.schemas' of this component.`;
-      }
-      console.error(formatRuntimeError(RuntimeErrorCode.UNKNOWN_ELEMENT, message));
-    }
-  }
+  return ɵɵelement;
 }

@@ -12,7 +12,7 @@
  * Entry point for all public APIs of the language service package.
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 export interface PluginConfig {
   /**
@@ -20,11 +20,6 @@ export interface PluginConfig {
    * results.
    */
   angularOnly: boolean;
-  /**
-   * If true, return factory function for Ivy LS during plugin initialization.
-   * Otherwise return factory function for View Engine LS.
-   */
-  ivy: boolean;
   /**
    * If true, enable `strictTemplates` in Angular compiler options regardless
    * of its value in tsconfig.json.

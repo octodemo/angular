@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {ClassDeclaration, ClassMember, ClassMemberKind, CtorParameter, Declaration, DeclarationKind, DeclarationNode, Decorator, FunctionDefinition, Import, isDecoratorIdentifier, ReflectionHost} from './host';
 import {typeToValue} from './type_to_value';
@@ -20,11 +20,13 @@ export class TypeScriptReflectionHost implements ReflectionHost {
   constructor(protected checker: ts.TypeChecker) {}
 
   getDecoratorsOfDeclaration(declaration: DeclarationNode): Decorator[]|null {
-    if (declaration.decorators === undefined || declaration.decorators.length === 0) {
-      return null;
-    }
-    return declaration.decorators.map(decorator => this._reflectDecorator(decorator))
-        .filter((dec): dec is Decorator => dec !== null);
+    const decorators =
+        ts.canHaveDecorators(declaration) ? ts.getDecorators(declaration) : undefined;
+
+    return decorators !== undefined && decorators.length ?
+        decorators.map(decorator => this._reflectDecorator(decorator))
+            .filter((dec): dec is Decorator => dec !== null) :
+        null;
   }
 
   getMembersOfClass(clazz: ClassDeclaration): ClassMember[] {
@@ -199,14 +201,15 @@ export class TypeScriptReflectionHost implements ReflectionHost {
     return clazz.name;
   }
 
-  isStaticallyExported(clazz: ClassDeclaration): boolean {
-    // First check if there's an `export` modifier directly on the class declaration.
-    let topLevel: ts.Node = clazz;
-    if (ts.isVariableDeclaration(clazz) && ts.isVariableDeclarationList(clazz.parent)) {
-      topLevel = clazz.parent.parent;
+  isStaticallyExported(decl: ts.Node): boolean {
+    // First check if there's an `export` modifier directly on the declaration.
+    let topLevel = decl;
+    if (ts.isVariableDeclaration(decl) && ts.isVariableDeclarationList(decl.parent)) {
+      topLevel = decl.parent.parent;
     }
-    if (topLevel.modifiers !== undefined &&
-        topLevel.modifiers.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
+    const modifiers = ts.canHaveModifiers(topLevel) ? ts.getModifiers(topLevel) : undefined;
+    if (modifiers !== undefined &&
+        modifiers.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
       // The node is part of a declaration that's directly exported.
       return true;
     }
@@ -224,8 +227,8 @@ export class TypeScriptReflectionHost implements ReflectionHost {
       return false;
     }
 
-    const localExports = this.getLocalExportedClassesOfSourceFile(clazz.getSourceFile());
-    return localExports.has(clazz);
+    const localExports = this.getLocalExportedDeclarationsOfSourceFile(decl.getSourceFile());
+    return localExports.has(decl as ts.Declaration);
   }
 
   protected getDirectImportOfIdentifier(id: ts.Identifier): Import|null {
@@ -427,8 +430,9 @@ export class TypeScriptReflectionHost implements ReflectionHost {
     }
 
     const decorators = this.getDecoratorsOfDeclaration(node);
-    const isStatic = node.modifiers !== undefined &&
-        node.modifiers.some(mod => mod.kind === ts.SyntaxKind.StaticKeyword);
+    const modifiers = ts.getModifiers(node);
+    const isStatic =
+        modifiers !== undefined && modifiers.some(mod => mod.kind === ts.SyntaxKind.StaticKeyword);
 
     return {
       node,
@@ -444,17 +448,17 @@ export class TypeScriptReflectionHost implements ReflectionHost {
   }
 
   /**
-   * Get the set of classes declared in `file` which are exported.
+   * Get the set of declarations declared in `file` which are exported.
    */
-  private getLocalExportedClassesOfSourceFile(file: ts.SourceFile): Set<ClassDeclaration> {
+  private getLocalExportedDeclarationsOfSourceFile(file: ts.SourceFile): Set<ts.Declaration> {
     const cacheSf: SourceFileWithCachedExports = file as SourceFileWithCachedExports;
-    if (cacheSf[LocalExportedClasses] !== undefined) {
+    if (cacheSf[LocalExportedDeclarations] !== undefined) {
       // TS does not currently narrow symbol-keyed fields, hence the non-null assert is needed.
-      return cacheSf[LocalExportedClasses]!;
+      return cacheSf[LocalExportedDeclarations]!;
     }
 
-    const exportSet = new Set<ClassDeclaration>();
-    cacheSf[LocalExportedClasses] = exportSet;
+    const exportSet = new Set<ts.Declaration>();
+    cacheSf[LocalExportedDeclarations] = exportSet;
 
     const sfSymbol = this.checker.getSymbolAtLocation(cacheSf);
 
@@ -485,8 +489,7 @@ export class TypeScriptReflectionHost implements ReflectionHost {
       }
 
       if (exportedSymbol.valueDeclaration !== undefined &&
-          exportedSymbol.valueDeclaration.getSourceFile() === file &&
-          this.isClass(exportedSymbol.valueDeclaration)) {
+          exportedSymbol.valueDeclaration.getSourceFile() === file) {
         exportSet.add(exportedSymbol.valueDeclaration);
       }
       item = iter.next();
@@ -663,7 +666,8 @@ function getFarLeftIdentifier(propertyAccess: ts.PropertyAccessExpression): ts.I
  */
 function getContainingImportDeclaration(node: ts.Node): ts.ImportDeclaration|null {
   return ts.isImportSpecifier(node) ? node.parent!.parent!.parent! :
-                                      ts.isNamespaceImport(node) ? node.parent.parent : null;
+      ts.isNamespaceImport(node)    ? node.parent.parent :
+                                      null;
 }
 
 /**
@@ -677,10 +681,10 @@ function getExportedName(decl: ts.Declaration, originalId: ts.Identifier): strin
       originalId.text;
 }
 
-const LocalExportedClasses = Symbol('LocalExportedClasses');
+const LocalExportedDeclarations = Symbol('LocalExportedDeclarations');
 
 /**
- * A `ts.SourceFile` expando which includes a cached `Set` of local `ClassDeclarations` that are
+ * A `ts.SourceFile` expando which includes a cached `Set` of local `ts.Declaration`s that are
  * exported either directly (`export class ...`) or indirectly (via `export {...}`).
  *
  * This cache does not cause memory leaks as:
@@ -694,8 +698,8 @@ const LocalExportedClasses = Symbol('LocalExportedClasses');
  */
 interface SourceFileWithCachedExports extends ts.SourceFile {
   /**
-   * Cached `Set` of `ClassDeclaration`s which are locally declared in this file and are exported
+   * Cached `Set` of `ts.Declaration`s which are locally declared in this file and are exported
    * either directly or indirectly.
    */
-  [LocalExportedClasses]?: Set<ClassDeclaration>;
+  [LocalExportedDeclarations]?: Set<ts.Declaration>;
 }

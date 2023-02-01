@@ -1,28 +1,32 @@
 {
-  "pinVersions": false,
-  "semanticCommits": true,
-  "semanticPrefix": "build",
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "baseBranches": ["main"],
+  "enabledManagers": ["npm", "bazel", "github-actions"],
+  "stopUpdatingLabel": "action: merge",
+  "rangeStrategy": "replace",
+  "pinDigests": true,
+  "semanticCommits": "enabled",
+  "semanticCommitScope": "",
+  "semanticCommitType": "build",
+  "dependencyDashboard": true,
+  "commitBody": "See associated pull request for more information.",
   "separateMajorMinor": false,
-  "prHourlyLimit": 2,
-  "labels": ["target: minor", "comp: build & ci", "action: review"],
+  "prHourlyLimit": 3,
   "timezone": "America/Tijuana",
-  "lockFileMaintenance": {
-    "enabled": true
-  },
-  "schedule": ["after 10pm every weekday", "before 4am every weekday", "every weekend"],
-  "baseBranches": ["master"],
+  "lockFileMaintenance": {"enabled": true},
+  "labels": ["target: patch", "area: build & ci", "action: review"],
+  "ignorePaths": [
+    "aio/content/demos/first-app/package.json"
+  ],
   "ignoreDeps": [
-    "@babel/core",
-    "@babel/generator",
-    "@babel/parser",
-    "@babel/preset-env",
-    "@babel/template",
-    "@babel/traverse",
-    "@babel/types",
-    "@types/babel__core",
-    "@types/babel__generator",
-    "@types/babel__template",
-    "@types/babel__traverse",
+    "@angular/animations-12",
+    "@angular/common-12",
+    "@angular/core-12",
+    "@angular/forms-12",
+    "@angular/platform-browser-12",
+    "@angular/platform-browser-dynamic-12",
+    "@angular/platform-server-12",
+    "@angular/router-12",
     "@types/node",
     "@types/selenium-webdriver",
     "angular-1.5",
@@ -34,60 +38,69 @@
     "angular-mocks-1.7",
     "angular-mocks-1.8",
     "puppeteer",
-    "rollup",
+    "remark",
+    "remark-html",
     "selenium-webdriver",
     "watchr"
   ],
-  "packageFiles": [
-    "WORKSPACE",
-    "integration/bazel/WORKSPACE",
-    "package.json",
-    "packages/**/package.json",
-    "aio/package.json",
-    ".github/workflows/**/*.yml"
-  ],
   "packageRules": [
     {
-      "packagePatterns": ["^@angular/.*", "^@angular-devkit/.*", "^@schematics/.*", "angular/dev-infra"],
-      "groupName": "angular",
-      "pinVersions": false
-    },
-    {
-      "packagePatterns": ["^@babel/.*"],
-      "groupName": "babel",
-      "pinVersions": false
-    },
-    {
-      "packagePatterns": ["^@bazel/.*", "^build_bazel.*"],
-      "groupName": "bazel",
-      "pinVersions": false
-    },
-    {
-      "packagePatterns": ["^remark-.*", "remark"],
-      "groupName": "remark",
-      "pinVersions": false
-    },
-    {
-      "packageNames": ["typescript", "rxjs", "tslib"],
-      "separateMinorPatch": true
-    },
-    {
-      "packageNames": ["typescript", "rxjs", "tslib"],
-      "updateTypes": ["minor", "major"],
-      "enabled": false
-    },
-    {
-      "matchCurrentVersion": "0.0.0-PLACEHOLDER",
-      "enabled": false
-    },
-    {
-      "excludePackagePatterns": ["^@angular/.*", "^@angular-devkit/.*", "^@schematics/.*", "angular/dev-infra"],
       "matchPackagePatterns": ["*"],
       "matchUpdateTypes": ["minor", "patch"],
-      "matchCurrentVersion": ">=1",
       "groupName": "all non-major dependencies",
-      "groupSlug": "all-minor-patch",
-      "schedule": ["after 1am on Thursday"]
-    }
+      "schedule": ["after 10:00pm on monday", "before 04:00am on tuesday"]
+    },
+
+    {
+      "matchPackagePatterns": ["^@bazel/.*", "^build_bazel.*"],
+      "groupName": "bazel setup",
+      "schedule": ["at any time"]
+    },
+
+    {
+      "matchPackagePrefixes": ["@angular/", "angular/", "@angular-devkit", "@schematics/"],
+      "followTag": "next",
+      "groupName": "cross-repo Angular dependencies",
+      "schedule": ["at any time"]
+    },
+
+    {
+      "matchPackagePrefixes": ["@angular/", "angular/", "@angular-devkit", "@schematics/"],
+      "matchPaths": ["packages/**", "aio/tools/examples/shared/**"],
+      "followTag": null
+    },
+
+    {
+      "matchPackagePrefixes": ["@babel/"],
+      "groupName": "babel dependencies"
+    },
+
+    {
+      "matchPackagePrefixes": ["@angular-eslint/", "@typescript-eslint/"],
+      "groupName": "eslint dependencies"
+    },
+
+    {
+      "matchPackageNames": ["typescript", "tslib"],
+      "groupName": "typescript dependencies"
+    },
+
+    {
+      "matchPaths": [".github/workflows/scorecard.yml"],
+      "groupName": "scorecard action dependencies",
+      "groupSlug": "scorecard-action"
+    },
+
+    {
+      "matchPaths": ["aio/tools/examples/shared/*"],
+      "postUpgradeTasks": {
+        "commands": ["yarn --cwd=aio/tools/examples/shared run sync-deps"],
+        "fileFilters": ["aio/tools/examples/shared/boilerplate/**"]
+      }
+    },
+
+    {"matchCurrentVersion": "0.0.0-PLACEHOLDER", "enabled": false},
+
+    {"matchPaths": ["integration/**"], "enabled": false}
   ]
 }

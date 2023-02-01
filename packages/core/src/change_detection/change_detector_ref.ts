@@ -14,12 +14,6 @@ import {DECLARATION_COMPONENT_VIEW, LView} from '../render3/interfaces/view';
 import {getCurrentTNode, getLView} from '../render3/state';
 import {getComponentLViewByIndex} from '../render3/util/view_utils';
 import {ViewRef as R3_ViewRef} from '../render3/view_ref';
-import {noop} from '../util/noop';
-
-export const SWITCH_CHANGE_DETECTOR_REF_FACTORY__POST_R3__ = injectChangeDetectorRef;
-const SWITCH_CHANGE_DETECTOR_REF_FACTORY__PRE_R3__ = noop;
-const SWITCH_CHANGE_DETECTOR_REF_FACTORY: typeof injectChangeDetectorRef =
-    SWITCH_CHANGE_DETECTOR_REF_FACTORY__PRE_R3__;
 
 /**
  * Base class that provides change detection functionality.
@@ -74,7 +68,7 @@ export abstract class ChangeDetectorRef {
    *
    * Components are normally marked as dirty (in need of rerendering) when inputs
    * have changed or events have fired in the view. Call this method to ensure that
-   * a component is checked even if these triggers have not occured.
+   * a component is checked even if these triggers have not occurred.
    *
    * <!-- TODO: Add a link to a chapter on OnPush components -->
    *
@@ -110,7 +104,7 @@ export abstract class ChangeDetectorRef {
    * Checks the change detector and its children, and throws if any changes are detected.
    *
    * Use in development mode to verify that running change detection doesn't introduce
-   * other changes.
+   * other changes. Calling it in production mode is a noop.
    */
   abstract checkNoChanges(): void;
 
@@ -127,8 +121,7 @@ export abstract class ChangeDetectorRef {
    * @internal
    * @nocollapse
    */
-  static __NG_ELEMENT_ID__:
-      (flags: InjectFlags) => ChangeDetectorRef = SWITCH_CHANGE_DETECTOR_REF_FACTORY;
+  static __NG_ELEMENT_ID__: (flags: InjectFlags) => ChangeDetectorRef = injectChangeDetectorRef;
 }
 
 

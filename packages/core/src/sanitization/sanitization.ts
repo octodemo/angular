@@ -6,6 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import {XSS_SECURITY_URL} from '../error_details_base_url';
+import {RuntimeError, RuntimeErrorCode} from '../errors';
 import {getDocument} from '../render3/interfaces/document';
 import {SANITIZER} from '../render3/interfaces/view';
 import {getLView} from '../render3/state';
@@ -117,7 +119,9 @@ export function ɵɵsanitizeResourceUrl(unsafeResourceUrl: any): TrustedScriptUR
   if (allowSanitizationBypassAndThrow(unsafeResourceUrl, BypassType.ResourceUrl)) {
     return trustedScriptURLFromStringBypass(unwrapSafeValue(unsafeResourceUrl));
   }
-  throw new Error('unsafe value used in a resource URL context (see https://g.co/ng/security#xss)');
+  throw new RuntimeError(
+      RuntimeErrorCode.UNSAFE_VALUE_IN_RESOURCE_URL,
+      ngDevMode && `unsafe value used in a resource URL context (see ${XSS_SECURITY_URL})`);
 }
 
 /**
@@ -141,7 +145,9 @@ export function ɵɵsanitizeScript(unsafeScript: any): TrustedScript|string {
   if (allowSanitizationBypassAndThrow(unsafeScript, BypassType.Script)) {
     return trustedScriptFromStringBypass(unwrapSafeValue(unsafeScript));
   }
-  throw new Error('unsafe value used in a script context');
+  throw new RuntimeError(
+      RuntimeErrorCode.UNSAFE_VALUE_IN_SCRIPT,
+      ngDevMode && 'unsafe value used in a script context');
 }
 
 /**
@@ -234,19 +240,21 @@ export function ɵɵsanitizeUrlOrResourceUrl(unsafeUrl: any, tag: string, prop: 
 
 export function validateAgainstEventProperties(name: string) {
   if (name.toLowerCase().startsWith('on')) {
-    const msg = `Binding to event property '${name}' is disallowed for security reasons, ` +
+    const errorMessage =
+        `Binding to event property '${name}' is disallowed for security reasons, ` +
         `please use (${name.slice(2)})=...` +
         `\nIf '${name}' is a directive input, make sure the directive is imported by the` +
         ` current module.`;
-    throw new Error(msg);
+    throw new RuntimeError(RuntimeErrorCode.INVALID_EVENT_BINDING, errorMessage);
   }
 }
 
 export function validateAgainstEventAttributes(name: string) {
   if (name.toLowerCase().startsWith('on')) {
-    const msg = `Binding to event attribute '${name}' is disallowed for security reasons, ` +
+    const errorMessage =
+        `Binding to event attribute '${name}' is disallowed for security reasons, ` +
         `please use (${name.slice(2)})=...`;
-    throw new Error(msg);
+    throw new RuntimeError(RuntimeErrorCode.INVALID_EVENT_BINDING, errorMessage);
   }
 }
 

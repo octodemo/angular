@@ -5,7 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {AbsoluteFsPath, join} from '../../file_system';
 import {NoopImportRewriter, Reference, ReferenceEmitter} from '../../imports';
@@ -45,7 +45,7 @@ export class TypeCheckFile extends Environment {
       ref: Reference<ClassDeclaration<ts.ClassDeclaration>>, meta: TypeCheckBlockMetadata,
       domSchemaChecker: DomSchemaChecker, oobRecorder: OutOfBandDiagnosticRecorder,
       genericContextBehavior: TcbGenericContextBehavior): void {
-    const fnId = ts.createIdentifier(`_tcb${this.nextTcbId++}`);
+    const fnId = ts.factory.createIdentifier(`_tcb${this.nextTcbId++}`);
     const fn = generateTypeCheckBlock(
         this, ref, fnId, meta, domSchemaChecker, oobRecorder, genericContextBehavior);
     this.tcbStatements.push(fn);

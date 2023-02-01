@@ -6,11 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {AbsoluteSourceSpan, ASTWithSource, BindingPipe, EmptyExpr, Interpolation, MethodCall, ParserError, TemplateBinding, VariableBinding} from '@angular/compiler/src/expression_parser/ast';
+import {AbsoluteSourceSpan, ASTWithSource, BindingPipe, Call, EmptyExpr, Interpolation, ParserError, TemplateBinding, VariableBinding} from '@angular/compiler/src/expression_parser/ast';
 import {Lexer} from '@angular/compiler/src/expression_parser/lexer';
-import {IvyParser, Parser, SplitInterpolation} from '@angular/compiler/src/expression_parser/parser';
+import {Parser, SplitInterpolation} from '@angular/compiler/src/expression_parser/parser';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
-
 
 import {unparse, unparseWithSpan} from './utils/unparser';
 import {validate} from './utils/validator';
@@ -51,6 +50,8 @@ describe('parser', () => {
       checkAction('true!');
       checkAction('a!.b');
       checkAction('a!!!!.b');
+      checkAction('a!()');
+      checkAction('a.b!()');
     });
 
     it('should parse multiplicative expressions', () => {
@@ -208,25 +209,29 @@ describe('parser', () => {
       });
     });
 
-    describe('method calls', () => {
-      it('should parse method calls', () => {
+    describe('calls', () => {
+      it('should parse calls', () => {
         checkAction('fn()');
         checkAction('add(1, 2)');
         checkAction('a.add(1, 2)');
         checkAction('fn().add(1, 2)');
+        checkAction('fn()(1, 2)');
       });
 
       it('should parse an EmptyExpr with a correct span for a trailing empty argument', () => {
-        const ast = parseAction('fn(1, )').ast as MethodCall;
+        const ast = parseAction('fn(1, )').ast as Call;
         expect(ast.args[1]).toBeAnInstanceOf(EmptyExpr);
         const sourceSpan = (ast.args[1] as EmptyExpr).sourceSpan;
         expect([sourceSpan.start, sourceSpan.end]).toEqual([5, 6]);
       });
-    });
 
-    describe('functional calls', () => {
-      it('should parse function calls', () => {
-        checkAction('fn()(1, 2)');
+      it('should parse safe calls', () => {
+        checkAction('fn?.()');
+        checkAction('add?.(1, 2)');
+        checkAction('a.add?.(1, 2)');
+        checkAction('a?.add?.(1, 2)');
+        checkAction('fn?.().add?.(1, 2)');
+        checkAction('fn?.()?.(1, 2)');
       });
     });
 
@@ -316,6 +321,15 @@ describe('parser', () => {
           expect(ast.errors.length).toBe(1);
           expect(ast.errors[0].message).toContain('Unexpected token \'=\'');
         });
+
+        it('should recover on parenthesized empty rvalues', () => {
+          const ast = parseAction('(a[1] = b) = c = d');
+          expect(unparse(ast)).toEqual('a[1] = b');
+          validate(ast);
+
+          expect(ast.errors.length).toBe(1);
+          expect(ast.errors[0].message).toContain('Unexpected token \'=\'');
+        });
       });
     });
 
@@ -389,27 +403,22 @@ describe('parser', () => {
       expect(unparseWithSpan(ast)).toContain(['foo?.bar', '[nameSpan] bar']);
     });
 
-    it('should record method call span', () => {
+    it('should record call span', () => {
       const ast = parseAction('foo()');
       expect(unparseWithSpan(ast)).toContain(['foo()', 'foo()']);
-      expect(unparseWithSpan(ast)).toContain(['foo()', '[nameSpan] foo']);
+      expect(unparseWithSpan(ast)).toContain(['foo()', '[argumentSpan] ']);
+      expect(unparseWithSpan(ast)).toContain(['foo', '[nameSpan] foo']);
     });
 
-    it('should record method call argument span', () => {
+    it('should record call argument span', () => {
       const ast = parseAction('foo(1 + 2)');
       expect(unparseWithSpan(ast)).toContain(['foo(1 + 2)', '[argumentSpan] 1 + 2']);
     });
 
-    it('should record accessed method call span', () => {
+    it('should record accessed call span', () => {
       const ast = parseAction('foo.bar()');
       expect(unparseWithSpan(ast)).toContain(['foo.bar()', 'foo.bar()']);
-      expect(unparseWithSpan(ast)).toContain(['foo.bar()', '[nameSpan] bar']);
-    });
-
-    it('should record safe method call span', () => {
-      const ast = parseAction('foo?.bar()');
-      expect(unparseWithSpan(ast)).toContain(['foo?.bar()', 'foo?.bar()']);
-      expect(unparseWithSpan(ast)).toContain(['foo?.bar()', '[nameSpan] bar']);
+      expect(unparseWithSpan(ast)).toContain(['foo.bar', '[nameSpan] bar']);
     });
 
     it('should record property write span', () => {
@@ -552,21 +561,8 @@ describe('parser', () => {
         expectBindingError('"Foo"|#privateIdentifier"', 'identifier or keyword');
       });
 
-      it('should parse quoted expressions', () => {
-        checkBinding('a:b', 'a:b');
-      });
-
       it('should not crash when prefix part is not tokenizable', () => {
         checkBinding('"a:b"', '"a:b"');
-      });
-
-      it('should ignore whitespace around quote prefix', () => {
-        checkBinding(' a :b', 'a:b');
-      });
-
-      it('should refuse prefixes that are not single identifiers', () => {
-        expectBindingError('a + b:c', '');
-        expectBindingError('1:c', '');
       });
     });
 
@@ -607,10 +603,6 @@ describe('parser', () => {
 
     it('should retain // in string literals', () => {
       checkBinding(`"http://www.google.com"`, `"http://www.google.com"`);
-    });
-
-    it('should retain // in : microsyntax', () => {
-      checkBinding('one:a//b', 'one:a//b');
     });
   });
 
@@ -1012,7 +1004,8 @@ describe('parser', () => {
 
     it('should support custom interpolation', () => {
       const parser = new Parser(new Lexer());
-      const ast = parser.parseInterpolation('{% a %}', '', 0, {start: '{%', end: '%}'})!.ast as any;
+      const ast =
+          parser.parseInterpolation('{% a %}', '', 0, null, {start: '{%', end: '%}'})!.ast as any;
       expect(ast.strings).toEqual(['', '']);
       expect(ast.expressions.length).toEqual(1);
       expect(ast.expressions[0].name).toEqual('a');
@@ -1080,66 +1073,64 @@ describe('parser', () => {
       expectError(validate(parseSimpleBinding('a = b')), 'Bindings cannot contain assignments');
     });
 
-    describe('Ivy-only validations', () => {
-      it('should throw if a pipe is used inside a conditional', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('(hasId | myPipe) ? "my-id" : ""')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a conditional', () => {
+      expectError(
+          validate(parseSimpleBinding('(hasId | myPipe) ? "my-id" : ""')),
+          'Host binding expression cannot contain pipes');
+    });
 
-      it('should throw if a pipe is used inside a function call', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('getId(true, id | myPipe)')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a call', () => {
+      expectError(
+          validate(parseSimpleBinding('getId(true, id | myPipe)')),
+          'Host binding expression cannot contain pipes');
+    });
 
-      it('should throw if a pipe is used inside a method call', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('idService.getId(true, id | myPipe)')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a call to a property access', () => {
+      expectError(
+          validate(parseSimpleBinding('idService.getId(true, id | myPipe)')),
+          'Host binding expression cannot contain pipes');
+    });
 
-      it('should throw if a pipe is used inside a safe method call', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('idService?.getId(true, id | myPipe)')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a call to a safe property access', () => {
+      expectError(
+          validate(parseSimpleBinding('idService?.getId(true, id | myPipe)')),
+          'Host binding expression cannot contain pipes');
+    });
 
-      it('should throw if a pipe is used inside a property access', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('a[id | myPipe]')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a property access', () => {
+      expectError(
+          validate(parseSimpleBinding('a[id | myPipe]')),
+          'Host binding expression cannot contain pipes');
+    });
 
-      it('should throw if a pipe is used inside a keyed read expression', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('a[id | myPipe].b')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a keyed read expression', () => {
+      expectError(
+          validate(parseSimpleBinding('a[id | myPipe].b')),
+          'Host binding expression cannot contain pipes');
+    });
 
-      it('should throw if a pipe is used inside a safe property read', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('(id | myPipe)?.id')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a safe property read', () => {
+      expectError(
+          validate(parseSimpleBinding('(id | myPipe)?.id')),
+          'Host binding expression cannot contain pipes');
+    });
 
-      it('should throw if a pipe is used inside a non-null assertion', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('[id | myPipe]!')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a non-null assertion', () => {
+      expectError(
+          validate(parseSimpleBinding('[id | myPipe]!')),
+          'Host binding expression cannot contain pipes');
+    });
 
-      it('should throw if a pipe is used inside a prefix not expression', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('!(id | myPipe)')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a prefix not expression', () => {
+      expectError(
+          validate(parseSimpleBinding('!(id | myPipe)')),
+          'Host binding expression cannot contain pipes');
+    });
 
-      it('should throw if a pipe is used inside a binary expression', () => {
-        expectError(
-            validate(parseSimpleBindingIvy('(id | myPipe) === true')),
-            'Host binding expression cannot contain pipes');
-      });
+    it('should throw if a pipe is used inside a binary expression', () => {
+      expectError(
+          validate(parseSimpleBinding('(id | myPipe) === true')),
+          'Host binding expression cannot contain pipes');
     });
   });
 
@@ -1181,12 +1172,8 @@ function createParser() {
   return new Parser(new Lexer());
 }
 
-function createIvyParser() {
-  return new IvyParser(new Lexer());
-}
-
 function parseAction(text: string, location: any = null, offset: number = 0): ASTWithSource {
-  return createParser().parseAction(text, location, offset);
+  return createParser().parseAction(text, /* isAssignmentEvent */ false, location, offset);
 }
 
 function parseBinding(text: string, location: any = null, offset: number = 0): ASTWithSource {
@@ -1217,20 +1204,15 @@ function _parseTemplateBindings(attribute: string, templateUrl: string) {
 
 function parseInterpolation(text: string, location: any = null, offset: number = 0): ASTWithSource|
     null {
-  return createParser().parseInterpolation(text, location, offset);
+  return createParser().parseInterpolation(text, location, offset, null);
 }
 
 function splitInterpolation(text: string, location: any = null): SplitInterpolation|null {
-  return createParser().splitInterpolation(text, location);
+  return createParser().splitInterpolation(text, location, null);
 }
 
 function parseSimpleBinding(text: string, location: any = null, offset: number = 0): ASTWithSource {
   return createParser().parseSimpleBinding(text, location, offset);
-}
-
-function parseSimpleBindingIvy(
-    text: string, location: any = null, offset: number = 0): ASTWithSource {
-  return createIvyParser().parseSimpleBinding(text, location, offset);
 }
 
 function checkInterpolation(exp: string, expected?: string) {

@@ -30,51 +30,55 @@ class IdentityInputMapping implements InputOutputPropertySet {
   }
 }
 
-function makeSelectorMatcher(): SelectorMatcher<DirectiveMeta> {
-  const matcher = new SelectorMatcher<DirectiveMeta>();
-  matcher.addSelectables(CssSelector.parse('[ngFor][ngForOf]'), {
-    name: 'NgFor',
-    exportAs: null,
-    inputs: new IdentityInputMapping(['ngForOf']),
-    outputs: new IdentityInputMapping([]),
-    isComponent: false,
-    isStructural: true,
-    selector: '[ngFor][ngForOf]',
-  });
-  matcher.addSelectables(CssSelector.parse('[dir]'), {
-    name: 'Dir',
-    exportAs: null,
-    inputs: new IdentityInputMapping([]),
-    outputs: new IdentityInputMapping([]),
-    isComponent: false,
-    isStructural: false,
-    selector: '[dir]'
-  });
-  matcher.addSelectables(CssSelector.parse('[hasOutput]'), {
-    name: 'HasOutput',
-    exportAs: null,
-    inputs: new IdentityInputMapping([]),
-    outputs: new IdentityInputMapping(['outputBinding']),
-    isComponent: false,
-    isStructural: false,
-    selector: '[hasOutput]'
-  });
-  matcher.addSelectables(CssSelector.parse('[hasInput]'), {
-    name: 'HasInput',
-    exportAs: null,
-    inputs: new IdentityInputMapping(['inputBinding']),
-    outputs: new IdentityInputMapping([]),
-    isComponent: false,
-    isStructural: false,
-    selector: '[hasInput]'
-  });
+function makeSelectorMatcher(): SelectorMatcher<DirectiveMeta[]> {
+  const matcher = new SelectorMatcher<DirectiveMeta[]>();
+  matcher.addSelectables(CssSelector.parse('[ngFor][ngForOf]'), [{
+                           name: 'NgFor',
+                           exportAs: null,
+                           inputs: new IdentityInputMapping(['ngForOf']),
+                           outputs: new IdentityInputMapping([]),
+                           isComponent: false,
+                           isStructural: true,
+                           selector: '[ngFor][ngForOf]',
+                           animationTriggerNames: null,
+                         }]);
+  matcher.addSelectables(CssSelector.parse('[dir]'), [{
+                           name: 'Dir',
+                           exportAs: null,
+                           inputs: new IdentityInputMapping([]),
+                           outputs: new IdentityInputMapping([]),
+                           isComponent: false,
+                           isStructural: false,
+                           selector: '[dir]',
+                           animationTriggerNames: null,
+                         }]);
+  matcher.addSelectables(CssSelector.parse('[hasOutput]'), [{
+                           name: 'HasOutput',
+                           exportAs: null,
+                           inputs: new IdentityInputMapping([]),
+                           outputs: new IdentityInputMapping(['outputBinding']),
+                           isComponent: false,
+                           isStructural: false,
+                           selector: '[hasOutput]',
+                           animationTriggerNames: null,
+                         }]);
+  matcher.addSelectables(CssSelector.parse('[hasInput]'), [{
+                           name: 'HasInput',
+                           exportAs: null,
+                           inputs: new IdentityInputMapping(['inputBinding']),
+                           outputs: new IdentityInputMapping([]),
+                           isComponent: false,
+                           isStructural: false,
+                           selector: '[hasInput]',
+                           animationTriggerNames: null,
+                         }]);
   return matcher;
 }
 
 describe('t2 binding', () => {
   it('should bind a simple template', () => {
     const template = parseTemplate('<div *ngFor="let item of items">{{item.name}}</div>', '', {});
-    const binder = new R3TargetBinder(new SelectorMatcher<DirectiveMeta>());
+    const binder = new R3TargetBinder(new SelectorMatcher<DirectiveMeta[]>());
     const res = binder.bind({template: template.nodes});
 
     const itemBinding =
@@ -104,16 +108,17 @@ describe('t2 binding', () => {
 
   it('should match directives on namespaced elements', () => {
     const template = parseTemplate('<svg><text dir>SVG</text></svg>', '', {});
-    const matcher = new SelectorMatcher<DirectiveMeta>();
-    matcher.addSelectables(CssSelector.parse('text[dir]'), {
-      name: 'Dir',
-      exportAs: null,
-      inputs: new IdentityInputMapping([]),
-      outputs: new IdentityInputMapping([]),
-      isComponent: false,
-      isStructural: false,
-      selector: 'text[dir]'
-    });
+    const matcher = new SelectorMatcher<DirectiveMeta[]>();
+    matcher.addSelectables(CssSelector.parse('text[dir]'), [{
+                             name: 'Dir',
+                             exportAs: null,
+                             inputs: new IdentityInputMapping([]),
+                             outputs: new IdentityInputMapping([]),
+                             isComponent: false,
+                             isStructural: false,
+                             selector: 'text[dir]',
+                             animationTriggerNames: null,
+                           }]);
     const binder = new R3TargetBinder(matcher);
     const res = binder.bind({template: template.nodes});
     const svgNode = template.nodes[0] as a.Element;

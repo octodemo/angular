@@ -13,7 +13,6 @@ export enum ErrorCode {
   DECORATOR_ARG_NOT_LITERAL = 1001,
   DECORATOR_ARITY_WRONG = 1002,
   DECORATOR_NOT_CALLED = 1003,
-  DECORATOR_ON_ANONYMOUS_CLASS = 1004,
   DECORATOR_UNEXPECTED = 1005,
 
   /**
@@ -56,16 +55,69 @@ export enum ErrorCode {
    */
   COMPONENT_INVALID_SHADOW_DOM_SELECTOR = 2009,
 
+  /**
+   * Raised when a component has `imports` but is not marked as `standalone: true`.
+   */
+  COMPONENT_NOT_STANDALONE = 2010,
+
+  /**
+   * Raised when a type in the `imports` of a component is a directive or pipe, but is not
+   * standalone.
+   */
+  COMPONENT_IMPORT_NOT_STANDALONE = 2011,
+
+  /**
+   * Raised when a type in the `imports` of a component is not a directive, pipe, or NgModule.
+   */
+  COMPONENT_UNKNOWN_IMPORT = 2012,
+
+  /**
+   * Raised when the compiler wasn't able to resolve the metadata of a host directive.
+   */
+  HOST_DIRECTIVE_INVALID = 2013,
+
+  /**
+   * Raised when a host directive isn't standalone.
+   */
+  HOST_DIRECTIVE_NOT_STANDALONE = 2014,
+
+  /**
+   * Raised when a host directive is a component.
+   */
+  HOST_DIRECTIVE_COMPONENT = 2015,
+
+  /**
+   * Raised when a type with Angular decorator inherits its constructor from a base class
+   * which has a constructor that is incompatible with Angular DI.
+   */
+  INJECTABLE_INHERITS_INVALID_CONSTRUCTOR = 2016,
+
+  /** Raised when a host tries to alias a host directive binding that does not exist. */
+  HOST_DIRECTIVE_UNDEFINED_BINDING = 2017,
+
+  /**
+   * Raised when a host tries to alias a host directive
+   * binding to a pre-existing binding's public name.
+   */
+  HOST_DIRECTIVE_CONFLICTING_ALIAS = 2018,
+
   SYMBOL_NOT_EXPORTED = 3001,
-  SYMBOL_EXPORTED_UNDER_DIFFERENT_NAME = 3002,
   /**
    * Raised when a relationship between directives and/or pipes would cause a cyclic import to be
    * created that cannot be handled, such as in partial compilation mode.
    */
   IMPORT_CYCLE_DETECTED = 3003,
 
+  /**
+   * Raised when the compiler is unable to generate an import statement for a reference.
+   */
+  IMPORT_GENERATION_FAILURE = 3004,
+
   CONFIG_FLAT_MODULE_NO_INDEX = 4001,
   CONFIG_STRICT_TEMPLATES_IMPLIES_FULL_TEMPLATE_TYPECHECK = 4002,
+  CONFIG_EXTENDED_DIAGNOSTICS_IMPLIES_STRICT_TEMPLATES = 4003,
+  CONFIG_EXTENDED_DIAGNOSTICS_UNKNOWN_CATEGORY_LABEL = 4004,
+  CONFIG_EXTENDED_DIAGNOSTICS_UNKNOWN_CHECK = 4005,
 
   /**
    * Raised when a host expression has a parse error, such as a host listener or host binding
@@ -115,6 +167,23 @@ export enum ErrorCode {
    * Raised when a directive/pipe is part of the declarations of two or more NgModules.
    */
   NGMODULE_DECLARATION_NOT_UNIQUE = 6007,
+
+  /**
+   * Raised when a standalone directive/pipe is part of the declarations of an NgModule.
+   */
+  NGMODULE_DECLARATION_IS_STANDALONE = 6008,
+
+  /**
+   * Raised when a standalone component is part of the bootstrap list of an NgModule.
+   */
+  NGMODULE_BOOTSTRAP_IS_STANDALONE = 6009,
+
+  /**
+   * Indicates that an NgModule is declared with `id: module.id`. This is an anti-pattern that is
+   * disabled explicitly in the compiler, that was originally based on a misunderstanding of
+   * `NgModule.id`.
+   */
+  WARN_NGMODULE_ID_UNNECESSARY = 6100,
 
   /**
    * Not actually raised by the compiler, but reserved for documentation of a View Engine error when
@@ -167,7 +236,7 @@ export enum ErrorCode {
   DUPLICATE_VARIABLE_DECLARATION = 8006,
 
   /**
-   * A template has a two way binding (two bindings created by a single syntactial element)
+   * A template has a two way binding (two bindings created by a single syntactical element)
    * in which the input and output are going to different places.
    */
   SPLIT_TWO_WAY_BINDING = 8007,
@@ -191,6 +260,63 @@ export enum ErrorCode {
    * When the type of foo doesn't include `null` or `undefined`.
    */
   NULLISH_COALESCING_NOT_NULLABLE = 8102,
+
+  /**
+   * A known control flow directive (e.g. `*ngIf`) is used in a template,
+   * but the `CommonModule` is not imported.
+   */
+  MISSING_CONTROL_FLOW_DIRECTIVE = 8103,
+
+  /**
+   * A text attribute is not interpreted as a binding but likely intended to be.
+   *
+   * For example:
+   * ```
+   * <div
+   *   attr.x="value"
+   *   class.blue="true"
+   *   style.margin-right.px="5">
+   * </div>
+   * ```
+   *
+   * All of the above attributes will just be static text attributes and will not be interpreted as
+   * bindings by the compiler.
+   */
+  TEXT_ATTRIBUTE_NOT_BINDING = 8104,
+
+  /**
+   * NgForOf is used in a template, but the user forgot to include let
+   * in their statement.
+   *
+   * For example:
+   * ```
+   * <ul><li *ngFor="item of items">{{item["name"]}};</li></ul>
+   * ```
+   */
+  MISSING_NGFOROF_LET = 8105,
+  /**
+   * Indicates that the binding suffix is not supported
+   *
+   * Style bindings support suffixes like `style.width.px`, `.em`, and `.%`.
+   * These suffixes are _not_ supported for attribute bindings.
+   *
+   * For example `[attr.width.px]="5"` becomes `width.px="5"` when bound.
+   * This is almost certainly unintentional and this error is meant to
+   * surface this mistake to the developer.
+   */
+  SUFFIX_NOT_SUPPORTED = 8106,
+
+  /**
+   * The left side of an optional chain operation is not nullable.
+   *
+   * ```
+   * {{ foo?.bar }}
+   * {{ foo?.['bar'] }}
+   * {{ foo?.() }}
+   * ```
+   * When the type of foo doesn't include `null` or `undefined`.
+   */
+  OPTIONAL_CHAIN_NOT_NULLABLE = 8107,
 
   /**
    * The template type-checking engine would need to generate an inline type check block for a
@@ -225,34 +351,4 @@ export enum ErrorCode {
    * type inference.
    */
   SUGGEST_SUBOPTIMAL_TYPE_INFERENCE = 10002,
-}
-
-/**
- * @internal
- * Base URL for the error details page.
- * Keep this value in sync with a similar const in
- * `packages/core/src/render3/error_code.ts`.
- */
-export const ERROR_DETAILS_PAGE_BASE_URL = 'https://angular.io/errors';
-
-/**
- * @internal
- * Contains a set of error messages that have detailed guides at angular.io.
- * Full list of available error guides can be found at https://angular.io/errors
- */
-export const COMPILER_ERRORS_WITH_GUIDES = new Set([
-  ErrorCode.DECORATOR_ARG_NOT_LITERAL,
-  ErrorCode.IMPORT_CYCLE_DETECTED,
-  ErrorCode.PARAM_MISSING_TOKEN,
-  ErrorCode.SCHEMA_INVALID_ELEMENT,
-  ErrorCode.SCHEMA_INVALID_ATTRIBUTE,
-  ErrorCode.MISSING_REFERENCE_TARGET,
-  ErrorCode.COMPONENT_INVALID_SHADOW_DOM_SELECTOR,
-]);
-
-/**
- * @internal
- */
-export function ngErrorCode(code: ErrorCode): number {
-  return parseInt('-99' + code);
 }

@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Location, LocationStrategy, PlatformLocation} from '@angular/common';
+import {Location, LocationStrategy} from '@angular/common';
 import {EventEmitter, Injectable} from '@angular/core';
 import {SubscriptionLike} from 'rxjs';
 
@@ -25,22 +25,25 @@ export class SpyLocation implements Location {
   /** @internal */
   _subject: EventEmitter<any> = new EventEmitter();
   /** @internal */
-  _baseHref: string = '';
+  _basePath: string = '';
   /** @internal */
-  _platformStrategy: LocationStrategy = null!;
-  /** @internal */
-  _platformLocation: PlatformLocation = null!;
+  _locationStrategy: LocationStrategy = null!;
   /** @internal */
   _urlChangeListeners: ((url: string, state: unknown) => void)[] = [];
   /** @internal */
-  _urlChangeSubscription?: SubscriptionLike;
+  _urlChangeSubscription: SubscriptionLike|null = null;
+
+  ngOnDestroy(): void {
+    this._urlChangeSubscription?.unsubscribe();
+    this._urlChangeListeners = [];
+  }
 
   setInitialPath(url: string) {
     this._history[this._historyIndex].path = url;
   }
 
   setBaseHref(url: string) {
-    this._baseHref = url;
+    this._basePath = url;
   }
 
   path(): string {
@@ -78,7 +81,7 @@ export class SpyLocation implements Location {
     if (url.length > 0 && !url.startsWith('/')) {
       url = '/' + url;
     }
-    return this._baseHref + url;
+    return this._basePath + url;
   }
 
   go(path: string, query: string = '', state: any = null) {
@@ -100,13 +103,15 @@ export class SpyLocation implements Location {
     path = this.prepareExternalUrl(path);
 
     const history = this._history[this._historyIndex];
+
+    history.state = state;
+
     if (history.path == path && history.query == query) {
       return;
     }
 
     history.path = path;
     history.query = query;
-    history.state = state;
 
     const url = path + (query.length > 0 ? ('?' + query) : '');
     this.urlChanges.push('replace: ' + url);
@@ -138,7 +143,7 @@ export class SpyLocation implements Location {
     }
   }
 
-  onUrlChange(fn: (url: string, state: unknown) => void) {
+  onUrlChange(fn: (url: string, state: unknown) => void): VoidFunction {
     this._urlChangeListeners.push(fn);
 
     if (!this._urlChangeSubscription) {
@@ -146,6 +151,16 @@ export class SpyLocation implements Location {
         this._notifyUrlChangeListeners(v.url, v.state);
       });
     }
+
+    return () => {
+      const fnIndex = this._urlChangeListeners.indexOf(fn);
+      this._urlChangeListeners.splice(fnIndex, 1);
+
+      if (this._urlChangeListeners.length === 0) {
+        this._urlChangeSubscription?.unsubscribe();
+        this._urlChangeSubscription = null;
+      }
+    };
   }
 
   /** @internal */

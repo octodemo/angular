@@ -11,7 +11,7 @@ import {Subscription} from 'rxjs';
 
 import {ComponentNgElementStrategyFactory} from './component-factory-strategy';
 import {NgElementStrategy, NgElementStrategyFactory} from './element-strategy';
-import {createCustomEvent, getComponentInputs, getDefaultAttributeToPropertyInputs} from './utils';
+import {getComponentInputs, getDefaultAttributeToPropertyInputs} from './utils';
 
 /**
  * Prototype for a class constructor based on an Angular component
@@ -184,8 +184,8 @@ export function createCustomElement<P>(
     override connectedCallback(): void {
       // For historical reasons, some strategies may not have initialized the `events` property
       // until after `connect()` is run. Subscribe to `events` if it is available before running
-      // `connect()` (in order to capture events emitted suring inittialization), otherwise
-      // subscribe afterwards.
+      // `connect()` (in order to capture events emitted during initialization), otherwise subscribe
+      // afterwards.
       //
       // TODO: Consider deprecating/removing the post-connect subscription in a future major version
       //       (e.g. v11).
@@ -223,7 +223,7 @@ export function createCustomElement<P>(
     private subscribeToEvents(): void {
       // Listen for events from the strategy and dispatch them as custom events.
       this.ngElementEventsSubscription = this.ngElementStrategy.events.subscribe(e => {
-        const customEvent = createCustomEvent(this.ownerDocument!, e.name, e.value);
+        const customEvent = new CustomEvent(e.name, {detail: e.value});
         this.dispatchEvent(customEvent);
       });
     }

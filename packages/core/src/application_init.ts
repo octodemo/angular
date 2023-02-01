@@ -7,6 +7,7 @@
  */
 
 import {Observable} from 'rxjs';
+
 import {Inject, Injectable, InjectionToken, Optional} from './di';
 import {isObservable, isPromise} from './util/lang';
 import {noop} from './util/noop';
@@ -91,7 +92,7 @@ export const APP_INITIALIZER =
  *
  * @publicApi
  */
-@Injectable()
+@Injectable({providedIn: 'root'})
 export class ApplicationInitStatus {
   private resolve = noop;
   private reject = noop;
@@ -101,6 +102,7 @@ export class ApplicationInitStatus {
 
   constructor(@Inject(APP_INITIALIZER) @Optional() private readonly appInits:
                   ReadonlyArray<() => Observable<unknown>| Promise<unknown>| void>) {
+    // TODO: Throw RuntimeErrorCode.INVALID_MULTI_PROVIDER if appInits is not an array
     this.donePromise = new Promise((res, rej) => {
       this.resolve = res;
       this.reject = rej;

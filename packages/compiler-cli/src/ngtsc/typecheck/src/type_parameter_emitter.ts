@@ -5,12 +5,12 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {OwningModule, Reference} from '../../imports';
-import {DeclarationNode, isNamedClassDeclaration, ReflectionHost} from '../../reflection';
+import {DeclarationNode, ReflectionHost} from '../../reflection';
 
-import {canEmitType, ResolvedTypeReference, TypeEmitter} from './type_emitter';
+import {canEmitType, TypeEmitter} from './type_emitter';
 
 
 /**
@@ -26,22 +26,35 @@ export class TypeParameterEmitter {
    * `emit` is known to succeed. Vice versa, if false is returned then `emit` should not be
    * called, as it would fail.
    */
-  canEmit(): boolean {
+  canEmit(canEmitReference: (ref: Reference) => boolean): boolean {
     if (this.typeParameters === undefined) {
       return true;
     }
 
     return this.typeParameters.every(typeParam => {
-      return this.canEmitType(typeParam.constraint) && this.canEmitType(typeParam.default);
+      return this.canEmitType(typeParam.constraint, canEmitReference) &&
+          this.canEmitType(typeParam.default, canEmitReference);
     });
   }
 
-  private canEmitType(type: ts.TypeNode|undefined): boolean {
+  private canEmitType(type: ts.TypeNode|undefined, canEmitReference: (ref: Reference) => boolean):
+      boolean {
     if (type === undefined) {
       return true;
     }
 
-    return canEmitType(type, typeReference => this.resolveTypeReference(typeReference));
+    return canEmitType(type, typeReference => {
+      const reference = this.resolveTypeReference(typeReference);
+      if (reference === null) {
+        return false;
+      }
+
+      if (reference instanceof Reference) {
+        return canEmitReference(reference);
+      }
+
+      return true;
+    });
   }
 
   /**
@@ -52,7 +65,7 @@ export class TypeParameterEmitter {
       return undefined;
     }
 
-    const emitter = new TypeEmitter(type => this.resolveTypeReference(type), emitReference);
+    const emitter = new TypeEmitter(type => this.translateTypeReference(type, emitReference));
 
     return this.typeParameters.map(typeParam => {
       const constraint =
@@ -60,15 +73,12 @@ export class TypeParameterEmitter {
       const defaultType =
           typeParam.default !== undefined ? emitter.emitType(typeParam.default) : undefined;
 
-      return ts.updateTypeParameterDeclaration(
-          /* node */ typeParam,
-          /* name */ typeParam.name,
-          /* constraint */ constraint,
-          /* defaultType */ defaultType);
+      return ts.factory.updateTypeParameterDeclaration(
+          typeParam, typeParam.modifiers, typeParam.name, constraint, defaultType);
     });
   }
 
-  private resolveTypeReference(type: ts.TypeReferenceNode): ResolvedTypeReference {
+  private resolveTypeReference(type: ts.TypeReferenceNode): Reference|ts.TypeReferenceNode|null {
     const target = ts.isIdentifier(type.typeName) ? type.typeName : type.typeName.right;
     const declaration = this.reflector.getDeclarationOfIdentifier(target);
 
@@ -92,17 +102,27 @@ export class TypeParameterEmitter {
       };
     }
 
-    // If no owning module is known, the reference needs to be exported to be able to emit an import
-    // statement for it. If the declaration is not exported, null is returned to prevent emit.
-    if (owningModule === null && !this.isStaticallyExported(declaration.node)) {
-      return null;
-    }
-
     return new Reference(declaration.node, owningModule);
   }
 
-  private isStaticallyExported(decl: DeclarationNode): boolean {
-    return isNamedClassDeclaration(decl) && this.reflector.isStaticallyExported(decl);
+  private translateTypeReference(
+      type: ts.TypeReferenceNode,
+      emitReference: (ref: Reference) => ts.TypeNode | null): ts.TypeReferenceNode|null {
+    const reference = this.resolveTypeReference(type);
+    if (!(reference instanceof Reference)) {
+      return reference;
+    }
+
+    const typeNode = emitReference(reference);
+    if (typeNode === null) {
+      return null;
+    }
+
+    if (!ts.isTypeReferenceNode(typeNode)) {
+      throw new Error(
+          `Expected TypeReferenceNode for emitted reference, got ${ts.SyntaxKind[typeNode.kind]}.`);
+    }
+    return typeNode;
   }
 
   private isLocalTypeParameter(decl: DeclarationNode): boolean {

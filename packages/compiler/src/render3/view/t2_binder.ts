@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {AST, BindingPipe, ImplicitReceiver, MethodCall, PropertyRead, PropertyWrite, RecursiveAstVisitor, SafeMethodCall, SafePropertyRead} from '../../expression_parser/ast';
+import {AST, BindingPipe, ImplicitReceiver, PropertyRead, PropertyWrite, RecursiveAstVisitor, SafePropertyRead} from '../../expression_parser/ast';
 import {SelectorMatcher} from '../../selector';
 import {BoundAttribute, BoundEvent, BoundText, Content, Element, Icu, Node, Reference, Template, Text, TextAttribute, Variable, Visitor} from '../r3_ast';
 
@@ -21,7 +21,7 @@ import {getAttrsForDirectiveMatching} from './util';
  * target.
  */
 export class R3TargetBinder<DirectiveT extends DirectiveMeta> implements TargetBinder<DirectiveT> {
-  constructor(private directiveMatcher: SelectorMatcher<DirectiveT>) {}
+  constructor(private directiveMatcher: SelectorMatcher<DirectiveT[]>) {}
 
   /**
    * Perform a binding operation on the given `Target` and return a `BoundTarget` which contains
@@ -192,7 +192,7 @@ class Scope implements Visitor {
  */
 class DirectiveBinder<DirectiveT extends DirectiveMeta> implements Visitor {
   constructor(
-      private matcher: SelectorMatcher<DirectiveT>,
+      private matcher: SelectorMatcher<DirectiveT[]>,
       private directives: Map<Element|Template, DirectiveT[]>,
       private bindings: Map<BoundAttribute|BoundEvent|TextAttribute, DirectiveT|Element|Template>,
       private references:
@@ -211,7 +211,7 @@ class DirectiveBinder<DirectiveT extends DirectiveMeta> implements Visitor {
    * template node.
    */
   static apply<DirectiveT extends DirectiveMeta>(
-      template: Node[], selectorMatcher: SelectorMatcher<DirectiveT>): {
+      template: Node[], selectorMatcher: SelectorMatcher<DirectiveT[]>): {
     directives: Map<Element|Template, DirectiveT[]>,
     bindings: Map<BoundAttribute|BoundEvent|TextAttribute, DirectiveT|Element|Template>,
     references: Map<Reference, {directive: DirectiveT, node: Element|Template}|Element|Template>,
@@ -245,7 +245,7 @@ class DirectiveBinder<DirectiveT extends DirectiveMeta> implements Visitor {
 
     // Next, use the `SelectorMatcher` to get the list of directives on the node.
     const directives: DirectiveT[] = [];
-    this.matcher.match(cssSelector, (_, directive) => directives.push(directive));
+    this.matcher.match(cssSelector, (_selector, results) => directives.push(...results));
     if (directives.length > 0) {
       this.directives.set(node, directives);
     }
@@ -330,8 +330,6 @@ class DirectiveBinder<DirectiveT extends DirectiveMeta> implements Visitor {
  */
 class TemplateBinder extends RecursiveAstVisitor implements Visitor {
   private visitNode: (node: Node) => void;
-
-  private pipesUsed: string[] = [];
 
   private constructor(
       private bindings: Map<AST, Reference|Variable>,
@@ -484,19 +482,8 @@ class TemplateBinder extends RecursiveAstVisitor implements Visitor {
     return super.visitPropertyWrite(ast, context);
   }
 
-  override visitMethodCall(ast: MethodCall, context: any): any {
-    this.maybeMap(context, ast, ast.name);
-    return super.visitMethodCall(ast, context);
-  }
-
-  override visitSafeMethodCall(ast: SafeMethodCall, context: any): any {
-    this.maybeMap(context, ast, ast.name);
-    return super.visitSafeMethodCall(ast, context);
-  }
-
-  private maybeMap(
-      scope: Scope, ast: PropertyRead|SafePropertyRead|PropertyWrite|MethodCall|SafeMethodCall,
-      name: string): void {
+  private maybeMap(scope: Scope, ast: PropertyRead|SafePropertyRead|PropertyWrite, name: string):
+      void {
     // If the receiver of the expression isn't the `ImplicitReceiver`, this isn't the root of an
     // `AST` expression that maps to a `Variable` or `Reference`.
     if (!(ast.receiver instanceof ImplicitReceiver)) {

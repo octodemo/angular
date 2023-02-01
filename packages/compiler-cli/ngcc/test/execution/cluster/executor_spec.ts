@@ -9,7 +9,7 @@
 /// <reference types="node" />
 
 import {getFileSystem} from '@angular/compiler-cli/src/ngtsc/file_system';
-import * as cluster from 'cluster';
+import cluster from 'cluster';
 
 import {MockFileSystemNative, runInEachFileSystem} from '../../../../src/ngtsc/file_system/testing';
 import {MockLogger} from '../../../../src/ngtsc/logging/testing';
@@ -20,6 +20,7 @@ import {FileWriter} from '../../../src/writing/file_writer';
 import {PackageJsonUpdater} from '../../../src/writing/package_json_updater';
 import {MockLockFile} from '../../helpers/mock_lock_file';
 import {mockProperty} from '../../helpers/spy_utils';
+import {mockRequireResolveForWorkerScript} from '../../helpers/utils';
 
 runInEachFileSystem(() => {
   describe('ClusterExecutor', () => {
@@ -33,6 +34,8 @@ runInEachFileSystem(() => {
     let createTaskCompletedCallback: jasmine.Spy;
 
     beforeEach(() => {
+      mockRequireResolveForWorkerScript();
+
       masterRunSpy = spyOn(ClusterMaster.prototype, 'run')
                          .and.returnValue(Promise.resolve('ClusterMaster#run()' as any));
       createTaskCompletedCallback = jasmine.createSpy('createTaskCompletedCallback');
@@ -86,7 +89,7 @@ runInEachFileSystem(() => {
         try {
           await executor.execute(analyzeEntryPointsSpy, createCompilerFnSpy);
         } catch (e) {
-          error = e.message;
+          error = (e as Error).message;
         }
         expect(analyzeEntryPointsSpy).toHaveBeenCalledWith();
         expect(createCompilerFnSpy).not.toHaveBeenCalled();
@@ -101,7 +104,7 @@ runInEachFileSystem(() => {
         try {
           await executor.execute(anyFn, anyFn);
         } catch (e) {
-          error = e.message;
+          error = (e as Error).message;
         }
         expect(error).toEqual('master runner error');
         expect(lockFileLog).toEqual(['write()', 'remove()']);
@@ -121,7 +124,7 @@ runInEachFileSystem(() => {
         try {
           await executor.execute(anyFn, anyFn);
         } catch (e) {
-          error = e.message;
+          error = (e as Error).message;
         }
         expect(error).toEqual('LockFile.write() error');
         expect(masterRunSpy).not.toHaveBeenCalled();
@@ -141,7 +144,7 @@ runInEachFileSystem(() => {
         try {
           await executor.execute(anyFn, anyFn);
         } catch (e) {
-          error = e.message;
+          error = (e as Error).message;
         }
         expect(error).toEqual('LockFile.remove() error');
         expect(lockFileLog).toEqual(['write()', 'remove()']);

@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {ErrorCode, ngErrorCode} from '../../diagnostics';
 import {findFlatIndexEntryPoint, FlatIndexGenerator} from '../../entry_point';
@@ -67,6 +67,12 @@ export class DelegatingCompilerHost implements
   trace = this.delegateMethod('trace');
   useCaseSensitiveFileNames = this.delegateMethod('useCaseSensitiveFileNames');
   writeFile = this.delegateMethod('writeFile');
+  getModuleResolutionCache = this.delegateMethod('getModuleResolutionCache');
+  // @ts-ignore 'hasInvalidatedResolutions' is visible (and thus required here) in latest TSC
+  // main. It's already present, so the code works at runtime.
+  // TODO: remove this comment including the suppression once Angular uses a TSC version that
+  // includes this change (github.com/microsoft/TypeScript@a455955).
+  hasInvalidatedResolutions = this.delegateMethod('hasInvalidatedResolutions');
 }
 
 /**
@@ -231,6 +237,16 @@ export class NgCompilerHost extends DelegatingCompilerHost implements
    */
   isShim(sf: ts.SourceFile): boolean {
     return isShim(sf);
+  }
+
+  /**
+   * Check whether the given `ts.SourceFile` is a resource file.
+   *
+   * This simply returns `false` for the compiler-cli since resource files are not added as root
+   * files to the project.
+   */
+  isResource(sf: ts.SourceFile): boolean {
+    return false;
   }
 
   getSourceFile(

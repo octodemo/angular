@@ -6,14 +6,37 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
+
+import {EmittedReference, Reference} from '../../imports';
 import {ClassDeclaration} from '../../reflection';
 import {SymbolWithValueDeclaration} from '../../util/src/typescript';
 
 /**
- * Metadata on a directive which is available in the scope of a template.
+ * A PotentialImport for some Angular trait has a TypeScript module specifier, which can be
+ * relative, as well as an identifier name.
  */
-export interface DirectiveInScope {
+export interface PotentialImport {
+  kind: PotentialImportKind;
+  // If no moduleSpecifier is present, the given symbol name is already in scope.
+  moduleSpecifier?: string;
+  symbolName: string;
+}
+
+/**
+ * Which kind of Angular Trait the import targets.
+ */
+export enum PotentialImportKind {
+  NgModule,
+  Standalone,
+}
+
+/**
+ * Metadata on a directive which is available in a template.
+ */
+export interface PotentialDirective {
+  ref: Reference<ClassDeclaration>;
+
   /**
    * The `ts.Symbol` for the directive class.
    */
@@ -27,7 +50,7 @@ export interface DirectiveInScope {
   /**
    * The selector for the directive or component.
    */
-  selector: string;
+  selector: string|null;
 
   /**
    * `true` if this directive is a component.
@@ -38,12 +61,19 @@ export interface DirectiveInScope {
    * `true` if this directive is a structural directive.
    */
   isStructural: boolean;
+
+  /**
+   * Whether or not this directive is in scope.
+   */
+  isInScope: boolean;
 }
 
 /**
- * Metadata for a pipe which is available in the scope of a template.
+ * Metadata for a pipe which is available in a template.
  */
-export interface PipeInScope {
+export interface PotentialPipe {
+  ref: Reference<ClassDeclaration>;
+
   /**
    * The `ts.Symbol` for the pipe class.
    */
@@ -53,4 +83,24 @@ export interface PipeInScope {
    * Name of the pipe.
    */
   name: string;
+
+  /**
+   * Whether or not this pipe is in scope.
+   */
+  isInScope: boolean;
+}
+
+/**
+ * Possible modes in which to look up a potential import.
+ */
+export enum PotentialImportMode {
+  /** Whether an import is standalone is inferred based on its metadata. */
+  Normal,
+
+  /**
+   * An import is assumed to be standalone and is imported directly. This is useful for migrations
+   * where a declaration wasn't standalone when the program was created, but will become standalone
+   * as a part of the migration.
+   */
+  ForceDirect,
 }

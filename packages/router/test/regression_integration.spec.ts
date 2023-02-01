@@ -6,12 +6,16 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {CommonModule, Location} from '@angular/common';
-import {SpyLocation} from '@angular/common/testing';
-import {ChangeDetectionStrategy, ChangeDetectorRef, Component, NgModule, TemplateRef, Type, ViewChild, ViewContainerRef} from '@angular/core';
+import {CommonModule, HashLocationStrategy, Location, LocationStrategy} from '@angular/common';
+import {provideLocationMocks, SpyLocation} from '@angular/common/testing';
+import {ChangeDetectionStrategy, ChangeDetectorRef, Component, Injectable, NgModule, TemplateRef, Type, ViewChild, ViewContainerRef} from '@angular/core';
 import {ComponentFixture, fakeAsync, TestBed, tick} from '@angular/core/testing';
-import {Router} from '@angular/router';
+import {ChildrenOutletContexts, Resolve, Router, RouterOutlet} from '@angular/router';
 import {RouterTestingModule} from '@angular/router/testing';
+import {of} from 'rxjs';
+import {delay, mapTo} from 'rxjs/operators';
+
+import {provideRouter} from '../src/provide_router';
 
 describe('Integration', () => {
   describe('routerLinkActive', () => {
@@ -86,7 +90,6 @@ describe('Integration', () => {
          @NgModule({
            imports: [CommonModule, RouterTestingModule],
            declarations: [MyCmp, SimpleCmp],
-           entryComponents: [SimpleCmp],
          })
          class MyModule {
          }
@@ -120,18 +123,18 @@ describe('Integration', () => {
         `
          })
          class ComponentWithRouterLink {
-           // TODO(issue/24571): remove '!'.
-           @ViewChild(TemplateRef, {static: true}) templateRef!: TemplateRef<any>;
-           // TODO(issue/24571): remove '!'.
+           @ViewChild(TemplateRef, {static: true}) templateRef?: TemplateRef<unknown>;
            @ViewChild('container', {read: ViewContainerRef, static: true})
-           container!: ViewContainerRef;
+           container?: ViewContainerRef;
 
            addLink() {
-             this.container.createEmbeddedView(this.templateRef, {$implicit: '/simple'});
+             if (this.templateRef) {
+               this.container?.createEmbeddedView(this.templateRef, {$implicit: '/simple'});
+             }
            }
 
            removeLink() {
-             this.container.clear();
+             this.container?.clear();
            }
          }
 
@@ -238,13 +241,16 @@ describe('Integration', () => {
          @Component({template: 'simple'})
          class SimpleCmp {
          }
+         @Component({template: 'one'})
+         class OneCmp {
+         }
 
          TestBed.configureTestingModule({
            imports: [RouterTestingModule.withRoutes([
              {path: '', component: SimpleCmp},
-             {path: 'one', component: SimpleCmp, canActivate: ['returnRootUrlTree']}
+             {path: 'one', component: OneCmp, canActivate: ['returnRootUrlTree']}
            ])],
-           declarations: [SimpleCmp, RootCmp],
+           declarations: [SimpleCmp, RootCmp, OneCmp],
            providers: [
              {
                provide: 'returnRootUrlTree',
@@ -267,9 +273,121 @@ describe('Integration', () => {
          advance(fixture);
 
          expect(location.path()).toEqual('/');
-         const urlChanges = ['replace: /', 'hash: /one', 'replace: /'];
-         expect(location.urlChanges).toEqual(urlChanges);
+         expect(fixture.nativeElement.innerHTML).toContain('one');
        }));
+  });
+
+  describe('duplicate navigation handling (#43447, #43446)', () => {
+    let location: SpyLocation;
+    let router: Router;
+    let fixture: ComponentFixture<{}>;
+
+    beforeEach(fakeAsync(() => {
+      @Injectable()
+      class DelayedResolve implements Resolve<{}> {
+        resolve() {
+          return of('').pipe(delay(1000), mapTo(true));
+        }
+      }
+      @Component({selector: 'root-cmp', template: `<router-outlet></router-outlet>`})
+      class RootCmp {
+      }
+
+      @Component({template: 'simple'})
+      class SimpleCmp {
+      }
+      @Component({template: 'one'})
+      class OneCmp {
+      }
+      TestBed.configureTestingModule({
+        declarations: [SimpleCmp, RootCmp, OneCmp],
+        imports: [RouterOutlet],
+        providers: [
+          DelayedResolve,
+          provideLocationMocks(),
+          provideRouter(
+              [
+                {path: '', component: SimpleCmp},
+                {path: 'one', component: OneCmp, resolve: {x: DelayedResolve}}
+              ],
+              ),
+          {provide: LocationStrategy, useClass: HashLocationStrategy},
+        ],
+      });
+
+      router = TestBed.inject(Router);
+      location = TestBed.inject(Location) as SpyLocation;
+
+      router.navigateByUrl('/');
+      // Will setup location change listeners
+      fixture = createRoot(router, RootCmp);
+    }));
+
+    it('duplicate navigation to same url', fakeAsync(() => {
+         location.simulateHashChange('/one');
+         tick(100);
+         location.simulateHashChange('/one');
+         tick(1000);
+         advance(fixture);
+
+         expect(location.path()).toEqual('/one');
+         expect(fixture.nativeElement.innerHTML).toContain('one');
+       }));
+
+    it('works with a duplicate popstate/hashchange navigation (as seen in firefox)',
+       fakeAsync(() => {
+         (location as any)._subject.emit({'url': 'one', 'pop': true, 'type': 'popstate'});
+         tick(1);
+         (location as any)._subject.emit({'url': 'one', 'pop': true, 'type': 'hashchange'});
+         tick(1000);
+         advance(fixture);
+
+         expect(router.routerState.toString()).toContain(`url:'one'`);
+         expect(fixture.nativeElement.innerHTML).toContain('one');
+       }));
+  });
+
+  it('should not unregister outlet if a different one already exists #36711, 32453', async () => {
+    @Component({
+      template: `
+      <router-outlet *ngIf="outlet1"></router-outlet>
+      <router-outlet *ngIf="outlet2"></router-outlet>
+      `,
+    })
+    class TestCmp {
+      outlet1 = true;
+      outlet2 = false;
+    }
+
+    @Component({template: ''})
+    class EmptyCmp {
+    }
+
+    TestBed.configureTestingModule({
+      imports: [CommonModule, RouterTestingModule.withRoutes([{path: '**', component: EmptyCmp}])],
+      declarations: [TestCmp, EmptyCmp]
+    });
+    const fixture = TestBed.createComponent(TestCmp);
+    const contexts = TestBed.inject(ChildrenOutletContexts);
+    await TestBed.inject(Router).navigateByUrl('/');
+    fixture.detectChanges();
+
+    expect(contexts.getContext('primary')).toBeDefined();
+    expect(contexts.getContext('primary')?.outlet).not.toBeNull();
+
+    // Show the second outlet. Applications shouldn't really have more than one outlet but there can
+    // be timing issues between destroying and recreating a second one in some cases:
+    // https://github.com/angular/angular/issues/36711,
+    // https://github.com/angular/angular/issues/32453
+    fixture.componentInstance.outlet2 = true;
+    fixture.detectChanges();
+    expect(contexts.getContext('primary')?.outlet).not.toBeNull();
+
+    fixture.componentInstance.outlet1 = false;
+    fixture.detectChanges();
+    // Destroying the first one show not clear the outlet context because the second one takes over
+    // as the registered outlet.
+    expect(contexts.getContext('primary')?.outlet).not.toBeNull();
   });
 });
 

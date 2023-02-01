@@ -7,8 +7,7 @@
  */
 
 import {CommonModule} from '@angular/common';
-import {ChangeDetectorRef, Component, Directive, TemplateRef, ViewChild, ViewContainerRef} from '@angular/core';
-import {Input} from '@angular/core/src/metadata';
+import {ChangeDetectorRef, Component, Directive, Input, TemplateRef, ViewChild, ViewContainerRef} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {By} from '@angular/platform-browser';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
@@ -322,7 +321,7 @@ describe('projection', () => {
        @Component(
            {selector: 'comp', template: `<ng-template><ng-content></ng-content></ng-template>`})
        class Comp {
-         @ViewChild(TemplateRef, {static: true}) template !: TemplateRef<any>;
+         @ViewChild(TemplateRef, {static: true}) template!: TemplateRef<any>;
        }
 
        @Directive({selector: '[trigger]'})
@@ -996,9 +995,7 @@ describe('projection', () => {
     const fixture = TestBed.createComponent(CardWithTitle);
     fixture.detectChanges();
 
-    // Compare the text output, because Ivy and ViewEngine produce slightly different HTML.
-    expect(fixture.nativeElement.textContent)
-        .toContain('Title --- Subtitle --- content --- footer');
+    expect(fixture.nativeElement.textContent).toEqual('Title --- Subtitle --- content --- footer');
   });
 
   it('should support ngProjectAs on elements (including <ng-content>)', () => {
@@ -1038,8 +1035,7 @@ describe('projection', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
-    // Compare the text output, because Ivy and ViewEngine produce slightly different HTML.
-    expect(fixture.nativeElement.textContent).toContain('Title --- content');
+    expect(fixture.nativeElement.textContent).toEqual('Title --- content');
   });
 
   it('should not match multiple selectors in ngProjectAs', () => {
@@ -1067,8 +1063,7 @@ describe('projection', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
-    // Compare the text output, because Ivy and ViewEngine produce slightly different HTML.
-    expect(fixture.nativeElement.textContent).not.toContain('Title content');
+    expect(fixture.nativeElement.textContent).not.toEqual('Title content');
   });
 
   it('should preserve ngProjectAs and other attributes on projected element', () => {

@@ -11,6 +11,7 @@ import {fakeAsync, flushMicrotasks, tick} from '@angular/core/testing';
 import {AbstractControl, CheckboxControlValueAccessor, ControlValueAccessor, DefaultValueAccessor, FormArray, FormArrayName, FormControl, FormControlDirective, FormControlName, FormGroup, FormGroupDirective, FormGroupName, NgControl, NgForm, NgModel, NgModelGroup, SelectControlValueAccessor, SelectMultipleControlValueAccessor, ValidationErrors, Validator, Validators} from '@angular/forms';
 import {selectValueAccessor} from '@angular/forms/src/directives/shared';
 import {composeValidators} from '@angular/forms/src/validators';
+
 import {asyncValidator} from './util';
 
 class DummyControlValueAccessor implements ControlValueAccessor {
@@ -53,7 +54,7 @@ class CustomValidatorDirective implements Validator {
         it('should throw when accessor is not provided as array', () => {
           expect(() => selectValueAccessor(dir, {} as any[]))
               .toThrowError(
-                  `Value accessor was not provided as an array for form control with unspecified name attribute`);
+                  'NG01200: Value accessor was not provided as an array for form control with unspecified name attribute. Check that the \`NG_VALUE_ACCESSOR\` token is configured as a \`multi: true\` provider.');
         });
 
         it('should return the default value accessor when no other provided', () => {
@@ -111,14 +112,14 @@ class CustomValidatorDirective implements Validator {
 
       describe('composeValidators', () => {
         it('should compose functions', () => {
-          const dummy1 = (_: any /** TODO #9100 */) => ({'dummy1': true});
-          const dummy2 = (_: any /** TODO #9100 */) => ({'dummy2': true});
+          const dummy1 = () => ({'dummy1': true});
+          const dummy2 = () => ({'dummy2': true});
           const v = composeValidators([dummy1, dummy2])!;
           expect(v(new FormControl(''))).toEqual({'dummy1': true, 'dummy2': true});
         });
 
         it('should compose validator directives', () => {
-          const dummy1 = (_: any /** TODO #9100 */) => ({'dummy1': true});
+          const dummy1 = () => ({'dummy1': true});
           const v = composeValidators([dummy1, new CustomValidatorDirective()])!;
           expect(v(new FormControl(''))).toEqual({'dummy1': true, 'custom': true});
         });
@@ -183,7 +184,8 @@ class CustomValidatorDirective implements Validator {
           dir.name = 'login';
 
           expect(() => form.addControl(dir))
-              .toThrowError(new RegExp(`No value accessor for form control with name: 'login'`));
+              .toThrowError(new RegExp(
+                  `NG01203: No value accessor for form control name: 'login'. Find more at https://angular.io/errors/NG01203`));
         });
 
         it('should throw when no value accessor with path', () => {
@@ -194,7 +196,7 @@ class CustomValidatorDirective implements Validator {
 
           expect(() => form.addControl(dir))
               .toThrowError(new RegExp(
-                  `No value accessor for form control with path: 'passwords -> password'`));
+                  `NG01203: No value accessor for form control path: 'passwords -> password'. Find more at https://angular.io/errors/NG01203`));
         });
 
         it('should set up validators', fakeAsync(() => {
@@ -307,10 +309,10 @@ class CustomValidatorDirective implements Validator {
     });
 
     describe('NgForm', () => {
-      let form: any /** TODO #9100 */;
+      let form: NgForm;
       let formModel: FormGroup;
-      let loginControlDir: any /** TODO #9100 */;
-      let personControlGroupDir: any /** TODO #9100 */;
+      let loginControlDir: NgModel;
+      let personControlGroupDir: NgModelGroup;
 
       beforeEach(() => {
         form = new NgForm([], []);
@@ -382,7 +384,7 @@ class CustomValidatorDirective implements Validator {
       });
 
       it('should set up sync validator', fakeAsync(() => {
-           const formValidator = (c: any /** TODO #9100 */) => ({'custom': true});
+           const formValidator = () => ({'custom': true});
            const f = new NgForm([formValidator], []);
 
            tick();
@@ -400,8 +402,8 @@ class CustomValidatorDirective implements Validator {
     });
 
     describe('FormGroupName', () => {
-      let formModel: any /** TODO #9100 */;
-      let controlGroupDir: any /** TODO #9100 */;
+      let formModel: FormGroup;
+      let controlGroupDir: FormGroupName;
 
       beforeEach(() => {
         formModel = new FormGroup({'login': new FormControl(null)});
@@ -479,9 +481,9 @@ class CustomValidatorDirective implements Validator {
     });
 
     describe('FormControlDirective', () => {
-      let controlDir: any /** TODO #9100 */;
-      let control: any /** TODO #9100 */;
-      const checkProperties = function(control: AbstractControl) {
+      let controlDir: FormControlDirective;
+      let control: FormControl;
+      const checkProperties = function(control: FormControl) {
         expect(controlDir.control).toBe(control);
         expect(controlDir.value).toBe(control.value);
         expect(controlDir.valid).toBe(control.valid);
@@ -581,15 +583,16 @@ class CustomValidatorDirective implements Validator {
         namedDir.name = 'one';
 
         expect(() => namedDir.ngOnChanges({}))
-            .toThrowError(new RegExp(`No value accessor for form control with name: 'one'`));
+            .toThrowError(new RegExp(
+                `NG01203: No value accessor for form control name: 'one'. Find more at https://angular.io/errors/NG01203`));
       });
 
       it('should throw when no value accessor with unnamed control', () => {
         const unnamedDir = new NgModel(null!, null!, null!, null!);
 
         expect(() => unnamedDir.ngOnChanges({}))
-            .toThrowError(
-                new RegExp(`No value accessor for form control with unspecified name attribute`));
+            .toThrowError(new RegExp(
+                `NG01203: No value accessor for form control unspecified name attribute. Find more at https://angular.io/errors/NG01203`));
       });
 
       it('should set up validator', fakeAsync(() => {
@@ -645,8 +648,8 @@ class CustomValidatorDirective implements Validator {
     });
 
     describe('FormControlName', () => {
-      let formModel: any /** TODO #9100 */;
-      let controlNameDir: any /** TODO #9100 */;
+      let formModel: FormControl;
+      let controlNameDir: FormControlName;
 
       beforeEach(() => {
         formModel = new FormControl('name');

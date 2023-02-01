@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import MagicString from 'magic-string';
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {PathManipulation} from '../../../src/ngtsc/file_system';
 import {Reexport} from '../../../src/ngtsc/imports';
@@ -16,9 +16,6 @@ import {UmdReflectionHost} from '../host/umd_host';
 
 import {Esm5RenderingFormatter} from './esm5_rendering_formatter';
 import {stripExtension} from './utils';
-
-type CommonJsConditional = ts.ConditionalExpression&{whenTrue: ts.CallExpression};
-type AmdConditional = ts.ConditionalExpression&{whenTrue: ts.CallExpression};
 
 /**
  * A RenderingFormatter that works with UMD files, instead of `import` and `export` statements
@@ -61,13 +58,14 @@ export class UmdRenderingFormatter extends Esm5RenderingFormatter {
       return;
     }
 
-    const wrapperFunction = umdModule.wrapperFn;
+    const {factoryFn, factoryCalls} = umdModule;
 
     // We need to add new `require()` calls for each import in the CommonJS initializer
-    renderCommonJsDependencies(output, wrapperFunction, imports);
-    renderAmdDependencies(output, wrapperFunction, imports);
-    renderGlobalDependencies(output, wrapperFunction, imports);
-    renderFactoryParameters(output, wrapperFunction, imports);
+    renderCommonJsDependencies(output, factoryCalls.commonJs, imports);
+    renderCommonJsDependencies(output, factoryCalls.commonJs2, imports);
+    renderAmdDependencies(output, factoryCalls.amdDefine, imports);
+    renderGlobalDependencies(output, factoryCalls.global, imports);
+    renderFactoryParameters(output, factoryFn, imports);
   }
 
   /**
@@ -137,15 +135,14 @@ export class UmdRenderingFormatter extends Esm5RenderingFormatter {
 }
 
 /**
- * Add dependencies to the CommonJS part of the UMD wrapper function.
+ * Add dependencies to the CommonJS/CommonJS2 part of the UMD wrapper function.
  */
 function renderCommonJsDependencies(
-    output: MagicString, wrapperFunction: ts.FunctionExpression, imports: Import[]) {
-  const conditional = find(wrapperFunction.body.statements[0], isCommonJSConditional);
-  if (!conditional) {
+    output: MagicString, factoryCall: ts.CallExpression|null, imports: Import[]) {
+  if (factoryCall === null) {
     return;
   }
-  const factoryCall = conditional.whenTrue;
+
   const injectionPoint = factoryCall.arguments.length > 0 ?
       // Add extra dependencies before the first argument
       factoryCall.arguments[0].getFullStart() :
@@ -159,12 +156,11 @@ function renderCommonJsDependencies(
  * Add dependencies to the AMD part of the UMD wrapper function.
  */
 function renderAmdDependencies(
-    output: MagicString, wrapperFunction: ts.FunctionExpression, imports: Import[]) {
-  const conditional = find(wrapperFunction.body.statements[0], isAmdConditional);
-  if (!conditional) {
+    output: MagicString, amdDefineCall: ts.CallExpression|null, imports: Import[]) {
+  if (amdDefineCall === null) {
     return;
   }
-  const amdDefineCall = conditional.whenTrue;
+
   const importString = imports.map(i => `'${i.specifier}'`).join(',');
   // The dependency array (if it exists) is the second to last argument
   // `define(id?, dependencies?, factory);`
@@ -191,39 +187,25 @@ function renderAmdDependencies(
  * Add dependencies to the global part of the UMD wrapper function.
  */
 function renderGlobalDependencies(
-    output: MagicString, wrapperFunction: ts.FunctionExpression, imports: Import[]) {
-  const globalFactoryCall = find(wrapperFunction.body.statements[0], isGlobalFactoryCall);
-  if (!globalFactoryCall) {
+    output: MagicString, factoryCall: ts.CallExpression|null, imports: Import[]) {
+  if (factoryCall === null) {
     return;
   }
-  const injectionPoint = globalFactoryCall.arguments.length > 0 ?
+
+  const injectionPoint = factoryCall.arguments.length > 0 ?
       // Add extra dependencies before the first argument
-      globalFactoryCall.arguments[0].getFullStart() :
+      factoryCall.arguments[0].getFullStart() :
       // Backup one char to account for the closing parenthesis on the call
-      globalFactoryCall.getEnd() - 1;
+      factoryCall.getEnd() - 1;
   const importString = imports.map(i => `global.${getGlobalIdentifier(i)}`).join(',');
-  output.appendLeft(
-      injectionPoint, importString + (globalFactoryCall.arguments.length > 0 ? ',' : ''));
+  output.appendLeft(injectionPoint, importString + (factoryCall.arguments.length > 0 ? ',' : ''));
 }
 
 /**
  * Add dependency parameters to the UMD factory function.
  */
 function renderFactoryParameters(
-    output: MagicString, wrapperFunction: ts.FunctionExpression, imports: Import[]) {
-  const wrapperCall = wrapperFunction.parent as ts.CallExpression;
-  const secondArgument = wrapperCall.arguments[1];
-  if (!secondArgument) {
-    return;
-  }
-
-  // Be resilient to the factory being inside parentheses
-  const factoryFunction =
-      ts.isParenthesizedExpression(secondArgument) ? secondArgument.expression : secondArgument;
-  if (!ts.isFunctionExpression(factoryFunction)) {
-    return;
-  }
-
+    output: MagicString, factoryFunction: ts.FunctionExpression, imports: Import[]) {
   const parameters = factoryFunction.parameters;
   const parameterString = imports.map(i => i.qualifier.text).join(',');
   if (parameters.length > 0) {
@@ -240,70 +222,10 @@ function renderFactoryParameters(
 }
 
 /**
- * Is this node the CommonJS conditional expression in the UMD wrapper?
- */
-function isCommonJSConditional(value: ts.Node): value is CommonJsConditional {
-  if (!ts.isConditionalExpression(value)) {
-    return false;
-  }
-  if (!ts.isBinaryExpression(value.condition) ||
-      value.condition.operatorToken.kind !== ts.SyntaxKind.AmpersandAmpersandToken) {
-    return false;
-  }
-  if (!oneOfBinaryConditions(value.condition, (exp) => isTypeOf(exp, 'exports', 'module'))) {
-    return false;
-  }
-  if (!ts.isCallExpression(value.whenTrue) || !ts.isIdentifier(value.whenTrue.expression)) {
-    return false;
-  }
-  return value.whenTrue.expression.text === 'factory';
-}
-
-/**
- * Is this node the AMD conditional expression in the UMD wrapper?
- */
-function isAmdConditional(value: ts.Node): value is AmdConditional {
-  if (!ts.isConditionalExpression(value)) {
-    return false;
-  }
-  if (!ts.isBinaryExpression(value.condition) ||
-      value.condition.operatorToken.kind !== ts.SyntaxKind.AmpersandAmpersandToken) {
-    return false;
-  }
-  if (!oneOfBinaryConditions(value.condition, (exp) => isTypeOf(exp, 'define'))) {
-    return false;
-  }
-  if (!ts.isCallExpression(value.whenTrue) || !ts.isIdentifier(value.whenTrue.expression)) {
-    return false;
-  }
-  return value.whenTrue.expression.text === 'define';
-}
-
-/**
- * Is this node the call to setup the global dependencies in the UMD wrapper?
- */
-function isGlobalFactoryCall(value: ts.Node): value is ts.CallExpression {
-  if (ts.isCallExpression(value) && !!value.parent) {
-    // Be resilient to the value being part of a comma list
-    value = isCommaExpression(value.parent) ? value.parent : value;
-    // Be resilient to the value being inside parentheses
-    value = ts.isParenthesizedExpression(value.parent) ? value.parent : value;
-    return !!value.parent && ts.isConditionalExpression(value.parent) &&
-        value.parent.whenFalse === value;
-  } else {
-    return false;
-  }
-}
-
-function isCommaExpression(value: ts.Node): value is ts.BinaryExpression {
-  return ts.isBinaryExpression(value) && value.operatorToken.kind === ts.SyntaxKind.CommaToken;
-}
-
-/**
  * Compute a global identifier for the given import (`i`).
  *
  * The identifier used to access a package when using the "global" form of a UMD bundle usually
- * follows a special format where snake-case is conveted to camelCase and path separators are
+ * follows a special format where snake-case is converted to camelCase and path separators are
  * converted to dots. In addition there are special cases such as `@angular` is mapped to `ng`.
  *
  * For example
@@ -319,7 +241,7 @@ function isCommaExpression(value: ts.Node): value is ts.BinaryExpression {
  *
  * If it turns out that there are packages that are being used via globals, where this approach
  * fails, we should consider implementing a configuration based solution, similar to what would go
- * in a rollup configuration for mapping import paths to global indentifiers.
+ * in a rollup configuration for mapping import paths to global identifiers.
  */
 function getGlobalIdentifier(i: Import): string {
   return i.specifier.replace(/^@angular\//, 'ng.')
@@ -327,18 +249,4 @@ function getGlobalIdentifier(i: Import): string {
       .replace(/\//g, '.')
       .replace(/[-_]+(.?)/g, (_, c) => c.toUpperCase())
       .replace(/^./, c => c.toLowerCase());
-}
-
-function find<T>(node: ts.Node, test: (node: ts.Node) => node is ts.Node & T): T|undefined {
-  return test(node) ? node : node.forEachChild(child => find<T>(child, test));
-}
-
-function oneOfBinaryConditions(
-    node: ts.BinaryExpression, test: (expression: ts.Expression) => boolean) {
-  return test(node.left) || test(node.right);
-}
-
-function isTypeOf(node: ts.Expression, ...types: string[]): boolean {
-  return ts.isBinaryExpression(node) && ts.isTypeOfExpression(node.left) &&
-      ts.isIdentifier(node.left.expression) && types.indexOf(node.left.expression.text) !== -1;
 }

@@ -6,7 +6,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import * as o from '@angular/compiler';
-import {createTaggedTemplate} from 'typescript';
 
 import {AstFactory, BinaryOperator, ObjectLiteralProperty, SourceMapRange, TemplateElement, TemplateLiteral, UnaryOperator} from './api/ast_factory';
 import {ImportGenerator} from './api/import_generator';
@@ -61,9 +60,9 @@ export class ExpressionTranslatorVisitor<TStatement, TExpression> implements o.E
   }
 
   visitDeclareVarStmt(stmt: o.DeclareVarStmt, context: Context): TStatement {
-    const varType = this.downlevelVariableDeclarations ?
-        'var' :
-        stmt.hasModifier(o.StmtModifier.Final) ? 'const' : 'let';
+    const varType = this.downlevelVariableDeclarations ? 'var' :
+        stmt.hasModifier(o.StmtModifier.Final)         ? 'const' :
+                                                         'let';
     return this.attachComments(
         this.factory.createVariableDeclaration(
             stmt.name, stmt.value?.visitExpression(this, context.withExpressionMode), varType),
@@ -93,10 +92,6 @@ export class ExpressionTranslatorVisitor<TStatement, TExpression> implements o.E
         stmt.leadingComments);
   }
 
-  visitDeclareClassStmt(_stmt: o.ClassStmt, _context: Context): never {
-    throw new Error('Method not implemented.');
-  }
-
   visitIfStmt(stmt: o.IfStmt, context: Context): TStatement {
     return this.attachComments(
         this.factory.createIfStatement(
@@ -106,17 +101,6 @@ export class ExpressionTranslatorVisitor<TStatement, TExpression> implements o.E
             stmt.falseCase.length > 0 ? this.factory.createBlock(this.visitStatements(
                                             stmt.falseCase, context.withStatementMode)) :
                                         null),
-        stmt.leadingComments);
-  }
-
-  visitTryCatchStmt(_stmt: o.TryCatchStmt, _context: Context): never {
-    throw new Error('Method not implemented.');
-  }
-
-  visitThrowStmt(stmt: o.ThrowStmt, context: Context): TStatement {
-    return this.attachComments(
-        this.factory.createThrowStatement(
-            stmt.error.visitExpression(this, context.withExpressionMode)),
         stmt.leadingComments);
   }
 
@@ -151,16 +135,6 @@ export class ExpressionTranslatorVisitor<TStatement, TExpression> implements o.E
     const target =
         this.factory.createPropertyAccess(expr.receiver.visitExpression(this, context), expr.name);
     return this.factory.createAssignment(target, expr.value.visitExpression(this, context));
-  }
-
-  visitInvokeMethodExpr(ast: o.InvokeMethodExpr, context: Context): TExpression {
-    const target = ast.receiver.visitExpression(this, context);
-    return this.setSourceMapRange(
-        this.factory.createCallExpression(
-            ast.name !== null ? this.factory.createPropertyAccess(target, ast.name) : target,
-            ast.args.map(arg => arg.visitExpression(this, context)),
-            /* pure */ false),
-        ast.sourceSpan);
   }
 
   visitInvokeFunctionExpr(ast: o.InvokeFunctionExpr, context: Context): TExpression {
@@ -325,14 +299,6 @@ export class ExpressionTranslatorVisitor<TStatement, TExpression> implements o.E
 
   visitNotExpr(ast: o.NotExpr, context: Context): TExpression {
     return this.factory.createUnaryExpression('!', ast.condition.visitExpression(this, context));
-  }
-
-  visitAssertNotNullExpr(ast: o.AssertNotNull, context: Context): TExpression {
-    return ast.condition.visitExpression(this, context);
-  }
-
-  visitCastExpr(ast: o.CastExpr, context: Context): TExpression {
-    return ast.value.visitExpression(this, context);
   }
 
   visitFunctionExpr(ast: o.FunctionExpr, context: Context): TExpression {

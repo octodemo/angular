@@ -7,19 +7,19 @@
  */
 
 import {CommonModule, Location} from '@angular/common';
-import {SpyLocation} from '@angular/common/testing';
-import {Component, Injectable, NgModule} from '@angular/core';
+import {provideLocationMocks, SpyLocation} from '@angular/common/testing';
+import {Component, Injectable, NgModule, Type} from '@angular/core';
 import {ComponentFixture, fakeAsync, TestBed, tick} from '@angular/core/testing';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
-import {CanActivate, CanDeactivate, Resolve, Router, RouterModule, UrlTree} from '@angular/router';
+import {CanActivate, CanDeactivate, Resolve, Router, RouterModule, RouterOutlet, UrlTree, withRouterConfig} from '@angular/router';
 import {EMPTY, Observable, of} from 'rxjs';
 
-import {isUrlTree} from '../src/utils/type_guards';
-import {RouterTestingModule} from '../testing';
+import {provideRouter} from '../src/provide_router';
+import {isUrlTree} from '../src/url_tree';
 
 describe('`restoredState#ɵrouterPageId`', () => {
   @Injectable({providedIn: 'root'})
-  class MyCanDeactivateGuard implements CanDeactivate<any> {
+  class MyCanDeactivateGuard implements CanDeactivate<unknown> {
     allow: boolean = true;
     canDeactivate(): boolean {
       return this.allow;
@@ -57,17 +57,11 @@ describe('`restoredState#ɵrouterPageId`', () => {
     }
   }
   @Injectable({providedIn: 'root'})
-  class MyResolve implements Resolve<Observable<any>> {
-    myresolve: Observable<any> = of(2);
-    resolve(): Observable<any> {
+  class MyResolve implements Resolve<Observable<unknown>> {
+    myresolve = of(2);
+    resolve() {
       return this.myresolve;
     }
-  }
-
-  @NgModule(
-      {imports: [RouterModule.forChild([{path: '', component: SimpleCmp}])]},
-      )
-  class LoadedModule {
   }
 
   let fixture: ComponentFixture<unknown>;
@@ -81,7 +75,6 @@ describe('`restoredState#ɵrouterPageId`', () => {
       ]
     });
     const router = TestBed.inject(Router);
-    (router as any).canceledNavigationResolution = 'computed';
     const location = TestBed.inject(Location);
     fixture = createRoot(router, RootCmp);
     router.resetConfig([
@@ -90,21 +83,21 @@ describe('`restoredState#ɵrouterPageId`', () => {
         component: SimpleCmp,
         canDeactivate: [MyCanDeactivateGuard],
         canActivate: [MyCanActivateGuard, ThrowingCanActivateGuard],
-        resolve: [MyResolve]
+        resolve: {x: MyResolve}
       },
       {
         path: 'second',
         component: SimpleCmp,
         canDeactivate: [MyCanDeactivateGuard],
         canActivate: [MyCanActivateGuard, ThrowingCanActivateGuard],
-        resolve: [MyResolve]
+        resolve: {x: MyResolve}
       },
       {
         path: 'third',
         component: SimpleCmp,
         canDeactivate: [MyCanDeactivateGuard],
         canActivate: [MyCanActivateGuard, ThrowingCanActivateGuard],
-        resolve: [MyResolve]
+        resolve: {x: MyResolve}
       },
       {
         path: 'unguarded',
@@ -114,7 +107,7 @@ describe('`restoredState#ɵrouterPageId`', () => {
         path: 'throwing',
         component: ThrowingCmp,
       },
-      {path: 'loaded', loadChildren: () => of(LoadedModule), canLoad: ['alwaysFalse']}
+      {path: 'loaded', loadChildren: () => of(ModuleWithSimpleCmpAsRoute), canLoad: ['alwaysFalse']}
     ]);
     router.navigateByUrl('/first');
     advance(fixture);
@@ -455,7 +448,7 @@ describe('`restoredState#ɵrouterPageId`', () => {
      }));
 });
 
-function createRoot(router: Router, type: any): ComponentFixture<any> {
+function createRoot<T>(router: Router, type: Type<T>): ComponentFixture<T> {
   const f = TestBed.createComponent(type);
   advance(f);
   router.initialNavigation();
@@ -465,6 +458,12 @@ function createRoot(router: Router, type: any): ComponentFixture<any> {
 
 @Component({selector: 'simple-cmp', template: `simple`})
 class SimpleCmp {
+}
+
+@NgModule(
+    {imports: [RouterModule.forChild([{path: '', component: SimpleCmp}])]},
+    )
+class ModuleWithSimpleCmpAsRoute {
 }
 
 @Component({selector: 'root-cmp', template: `<router-outlet></router-outlet>`})
@@ -480,15 +479,21 @@ class ThrowingCmp {
 
 
 
-function advance(fixture: ComponentFixture<any>, millis?: number): void {
+function advance(fixture: ComponentFixture<unknown>, millis?: number): void {
   tick(millis);
   fixture.detectChanges();
 }
 
 @NgModule({
-  imports: [RouterTestingModule, CommonModule],
+  imports: [
+    RouterOutlet,
+    CommonModule,
+  ],
+  providers: [
+    provideLocationMocks(),
+    provideRouter([], withRouterConfig({canceledNavigationResolution: 'computed'})),
+  ],
   exports: [SimpleCmp, RootCmp, ThrowingCmp],
-  entryComponents: [SimpleCmp, RootCmp, ThrowingCmp],
   declarations: [SimpleCmp, RootCmp, ThrowingCmp]
 })
 class TestModule {

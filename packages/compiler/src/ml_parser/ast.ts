@@ -6,9 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {AstPath} from '../ast_path';
 import {I18nMeta} from '../i18n/i18n_ast';
 import {ParseSourceSpan} from '../parse_util';
+
+import {InterpolatedAttributeToken, InterpolatedTextToken} from './tokens';
 
 interface BaseNode {
   sourceSpan: ParseSourceSpan;
@@ -23,7 +24,9 @@ export abstract class NodeWithI18n implements BaseNode {
 }
 
 export class Text extends NodeWithI18n {
-  constructor(public value: string, sourceSpan: ParseSourceSpan, i18n?: I18nMeta) {
+  constructor(
+      public value: string, sourceSpan: ParseSourceSpan, public tokens: InterpolatedTextToken[],
+      i18n?: I18nMeta) {
     super(sourceSpan, i18n);
   }
   override visit(visitor: Visitor, context: any): any {
@@ -55,8 +58,8 @@ export class ExpansionCase implements BaseNode {
 export class Attribute extends NodeWithI18n {
   constructor(
       public name: string, public value: string, sourceSpan: ParseSourceSpan,
-      readonly keySpan: ParseSourceSpan|undefined, public valueSpan?: ParseSourceSpan,
-      i18n?: I18nMeta) {
+      readonly keySpan: ParseSourceSpan|undefined, public valueSpan: ParseSourceSpan|undefined,
+      public valueTokens: InterpolatedAttributeToken[]|undefined, i18n: I18nMeta|undefined) {
     super(sourceSpan, i18n);
   }
   override visit(visitor: Visitor, context: any): any {
@@ -143,39 +146,4 @@ export class RecursiveVisitor implements Visitor {
     cb(visit);
     return Array.prototype.concat.apply([], results);
   }
-}
-
-export type HtmlAstPath = AstPath<Node>;
-
-function spanOf(ast: Node) {
-  const start = ast.sourceSpan.start.offset;
-  let end = ast.sourceSpan.end.offset;
-  if (ast instanceof Element) {
-    if (ast.endSourceSpan) {
-      end = ast.endSourceSpan.end.offset;
-    } else if (ast.children && ast.children.length) {
-      end = spanOf(ast.children[ast.children.length - 1]).end;
-    }
-  }
-  return {start, end};
-}
-
-export function findNode(nodes: Node[], position: number): HtmlAstPath {
-  const path: Node[] = [];
-
-  const visitor = new class extends RecursiveVisitor {
-    visit(ast: Node, context: any): any {
-      const span = spanOf(ast);
-      if (span.start <= position && position < span.end) {
-        path.push(ast);
-      } else {
-        // Returning a value here will result in the children being skipped.
-        return true;
-      }
-    }
-  };
-
-  visitAll(visitor, nodes);
-
-  return new AstPath<Node>(path, position);
 }

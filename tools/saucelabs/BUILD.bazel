@@ -1,4 +1,4 @@
-load("@build_bazel_rules_nodejs//:index.bzl", "nodejs_binary")
+load("//tools:defaults.bzl", "nodejs_binary")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -60,6 +60,6 @@ nodejs_binary(
         "@npm//sauce-connect",
         "@npm//shelljs",
     ],
-    entry_point = "karma-saucelabs.js",
+    entry_point = "karma-saucelabs.mjs",
     templated_args = ["$(rootpath sauce-service.sh)"],
 )

@@ -1,5 +1,5 @@
 // For more examples:
-//   https://github.com/angular/angular/blob/master/modules/@angular/router/test/integration.spec.ts
+//   https://github.com/angular/angular/blob/main/packages/router/test/integration.spec.ts
 
 import { waitForAsync, ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 
@@ -8,7 +8,7 @@ import { asyncData } from '../testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { SpyLocation } from '@angular/common/testing';
 
-import { Router, RouterLinkWithHref } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { By } from '@angular/platform-browser';
 import { DebugElement, Type } from '@angular/core';
@@ -81,13 +81,9 @@ describe('AppComponent & RouterTestingModule', () => {
 
 
 ///////////////
-import { NgModuleFactoryLoader } from '@angular/core';
-import { SpyNgModuleFactoryLoader } from '@angular/router/testing';
 
 import { HeroModule } from './hero/hero.module';  // should be lazy loaded
 import { HeroListComponent } from './hero/hero-list.component';
-
-let loader: SpyNgModuleFactoryLoader;
 
 ///////// Can't get lazy loaded Heroes to work yet
 xdescribe('AppComponent & Lazy Loading (not working yet)', () => {
@@ -104,9 +100,7 @@ xdescribe('AppComponent & Lazy Loading (not working yet)', () => {
 
   beforeEach(fakeAsync(() => {
     createComponent();
-    loader = TestBed.inject(NgModuleFactoryLoader) as SpyNgModuleFactoryLoader;
-    loader.stubbedModules = {expected: HeroModule};
-    router.resetConfig([{path: 'heroes', loadChildren: 'expected'}]);
+    router.resetConfig([{path: 'heroes', loadChildren: () => HeroModule}]);
   }));
 
   it('should navigate to "Heroes" on click', waitForAsync(() => {
@@ -163,7 +157,7 @@ class Page {
   fixture: ComponentFixture<AppComponent>;
 
   constructor() {
-    const links = fixture.debugElement.queryAll(By.directive(RouterLinkWithHref));
+    const links = fixture.debugElement.queryAll(By.directive(RouterLink));
     this.aboutLinkDe = links[2];
     this.dashboardLinkDe = links[0];
     this.heroesLinkDe = links[1];
@@ -176,11 +170,15 @@ class Page {
 }
 
 function expectPathToBe(path: string, expectationFailOutput?: any) {
-  expect(location.path()).toEqual(path, expectationFailOutput || 'location.path()');
+  expect(location.path())
+  .withContext(expectationFailOutput || 'location.path()')
+  .toEqual(path);
 }
 
 function expectElementOf(type: Type<any>): any {
   const el = fixture.debugElement.query(By.directive(type));
-  expect(el).toBeTruthy('expected an element for ' + type.name);
+  expect(el)
+    .withContext(`expected an element for ${type.name}`)
+    .toBeTruthy();
   return el;
 }

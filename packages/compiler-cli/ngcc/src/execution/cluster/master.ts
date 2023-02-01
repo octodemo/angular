@@ -8,7 +8,8 @@
 
 /// <reference types="node" />
 
-import * as cluster from 'cluster';
+import cluster, {Worker} from 'cluster';
+import module from 'module';
 
 import {AbsoluteFsPath, PathManipulation} from '../../../../src/ngtsc/file_system';
 import {Logger} from '../../../../src/ngtsc/logging';
@@ -20,7 +21,6 @@ import {stringifyTask} from '../tasks/utils';
 
 import {MessageFromWorker, TaskCompletedMessage, TransformedFilesMessage, UpdatePackageJsonMessage} from './api';
 import {Deferred, sendMessageToWorker} from './utils';
-
 
 /**
  * The cluster master is responsible for analyzing all entry-points, planning the work that needs to
@@ -44,7 +44,7 @@ export class ClusterMaster {
     }
 
     // Set the worker entry-point
-    cluster.setupMaster({exec: this.fileSystem.resolve(__dirname, 'worker.js')});
+    cluster.setupMaster({exec: ClusterWorkerScriptResolver.resolve(fileSystem)});
 
     this.taskQueue = analyzeEntryPoints();
     this.onTaskCompleted = createTaskCompletedCallback(this.taskQueue);
@@ -55,9 +55,9 @@ export class ClusterMaster {
       return Promise.resolve();
     }
 
-    // Set up listeners for worker events (emitted on `cluster`).
-    cluster.on('online', this.wrapEventHandler(worker => this.onWorkerOnline(worker.id)));
+    this.logger.info('Processing legacy "View Engine" libraries:');
 
+    // Set up listeners for worker events (emitted on `cluster`).
     cluster.on(
         'message', this.wrapEventHandler((worker, msg) => this.onWorkerMessage(worker.id, msg)));
 
@@ -82,6 +82,7 @@ export class ClusterMaster {
     if (this.taskQueue.allTasksCompleted) {
       const duration = Math.round((Date.now() - this.processingStartTime) / 100) / 10;
       this.logger.debug(`Processed tasks in ${duration}s.`);
+      this.logger.info('Encourage the library authors to publish an Ivy distribution.');
 
       return this.finishedDeferred.resolve();
     }
@@ -111,7 +112,7 @@ export class ClusterMaster {
     }
 
     if (!isWorkerAvailable) {
-      const spawnedWorkerCount = Object.keys(cluster.workers).length;
+      const spawnedWorkerCount = cluster.workers ? Object.keys(cluster.workers).length : 0;
       if (spawnedWorkerCount < this.maxWorkerCount) {
         this.logger.debug('Spawning another worker process as there is more work to be done.');
         cluster.fork();
@@ -143,7 +144,7 @@ export class ClusterMaster {
   }
 
   /** Handle a worker's exiting. (Might be intentional or not.) */
-  private onWorkerExit(worker: cluster.Worker, code: number|null, signal: string|null): void {
+  private onWorkerExit(worker: Worker, code: number|null, signal: string|null): void {
     // If the worker's exiting was intentional, nothing to do.
     if (worker.exitedAfterDisconnect) return;
 
@@ -155,8 +156,9 @@ export class ClusterMaster {
         `Worker #${worker.id} exited unexpectedly (code: ${code} | signal: ${signal}).\n` +
         `  Current task: ${(assignment == null) ? '-' : stringifyTask(assignment.task)}\n` +
         `  Current phase: ${
-            (assignment == null) ? '-' :
-                                   (assignment.files == null) ? 'compiling' : 'writing files'}`);
+            (assignment == null)           ? '-' :
+                (assignment.files == null) ? 'compiling' :
+                                             'writing files'}`);
 
     if (assignment == null) {
       // The crashed worker process was not in the middle of a task:
@@ -180,7 +182,7 @@ export class ClusterMaster {
 
       // The crashing might be a result of increased memory consumption by ngcc.
       // Do not spawn another process, unless this was the last worker process.
-      const spawnedWorkerCount = Object.keys(cluster.workers).length;
+      const spawnedWorkerCount = cluster.workers ? Object.keys(cluster.workers).length : 0;
       if (spawnedWorkerCount > 0) {
         this.logger.debug(`Not spawning another worker process to replace #${
             worker.id}. Continuing with ${spawnedWorkerCount} workers...`);
@@ -199,6 +201,14 @@ export class ClusterMaster {
 
   /** Handle a message from a worker. */
   private onWorkerMessage(workerId: number, msg: MessageFromWorker): void {
+    // A worker is now ready and can retrieve a processing task.
+    if (msg.type === 'ready') {
+      this.onWorkerReady(workerId);
+      return;
+    }
+
+    // All other messages except for `ready` are unexpected if the worker has
+    // not notified the `ClusterMaster` about being ready.
     if (!this.taskAssignments.has(workerId)) {
       const knownWorkers = Array.from(this.taskAssignments.keys());
       throw new Error(
@@ -221,8 +231,8 @@ export class ClusterMaster {
     }
   }
 
-  /** Handle a worker's coming online. */
-  private onWorkerOnline(workerId: number): void {
+  /** Handle a worker's coming online and ready for retrieving IPC messages. */
+  private onWorkerReady(workerId: number): void {
     if (this.taskAssignments.has(workerId)) {
       throw new Error(`Invariant violated: Worker #${workerId} came online more than once.`);
     }
@@ -308,11 +318,13 @@ export class ClusterMaster {
 
   /** Stop all workers and stop listening on cluster events. */
   private stopWorkers(): void {
-    const workers = Object.values(cluster.workers) as cluster.Worker[];
-    this.logger.debug(`Stopping ${workers.length} workers...`);
+    if (cluster.workers) {
+      const workers = Object.values(cluster.workers) as Worker[];
+      this.logger.debug(`Stopping ${workers.length} workers...`);
 
-    cluster.removeAllListeners();
-    workers.forEach(worker => worker.kill());
+      cluster.removeAllListeners();
+      workers.forEach(worker => worker.kill());
+    }
   }
 
   /**
@@ -328,5 +340,18 @@ export class ClusterMaster {
         this.finishedDeferred.reject(err);
       }
     };
+  }
+}
+
+/** Wrapper for resolving the cluster worker script. Useful for test patching. */
+export class ClusterWorkerScriptResolver {
+  static resolve(fileSystem: PathManipulation): AbsoluteFsPath {
+    // NodeJS `import.meta.resolve` is experimental. We leverage `require`.
+    const requireFn = module.createRequire(import.meta.url);
+    // We resolve the worker script using module resolution as in the package output,
+    // the worker might be bundled but exposed through a subpath export mapping.
+    const workerScriptPath =
+        requireFn.resolve('@angular/compiler-cli/ngcc/src/execution/cluster/ngcc_cluster_worker');
+    return fileSystem.resolve(workerScriptPath);
   }
 }

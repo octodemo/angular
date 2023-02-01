@@ -5,10 +5,10 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import {fromObject} from 'convert-source-map';
+import {encode} from '@jridgewell/sourcemap-codec';
+import mapHelpers from 'convert-source-map';
 import MagicString from 'magic-string';
-import {encode} from 'sourcemap-codec';
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {absoluteFrom, getFileSystem} from '../../../src/ngtsc/file_system';
 import {runInEachFileSystem, TestFile} from '../../../src/ngtsc/file_system/testing';
@@ -47,9 +47,6 @@ class TestRenderingFormatter implements RenderingFormatter {
   }
   removeDecorators(output: MagicString, decoratorsToRemove: RedundantDecoratorMap) {
     output.prepend('\n// REMOVE DECORATORS\n');
-  }
-  rewriteSwitchableDeclarations(output: MagicString, sourceFile: ts.SourceFile): void {
-    output.prepend('\n// REWRITTEN DECLARATIONS\n');
   }
   addModuleWithProvidersParams(
       output: MagicString, moduleWithProviders: ModuleWithProvidersInfo[],
@@ -92,7 +89,6 @@ function createTestRenderer(
   spyOn(testFormatter, 'addAdjacentStatements').and.callThrough();
   spyOn(testFormatter, 'addConstants').and.callThrough();
   spyOn(testFormatter, 'removeDecorators').and.callThrough();
-  spyOn(testFormatter, 'rewriteSwitchableDeclarations').and.callThrough();
   spyOn(testFormatter, 'addModuleWithProvidersParams').and.callThrough();
   spyOn(testFormatter, 'printStatement').and.callThrough();
 
@@ -217,7 +213,7 @@ runInEachFileSystem(() => {
 
     it('should render an internal source map for files whose original file has an internal source map',
        () => {
-         const sourceMap = fromObject({
+         const sourceMap = mapHelpers.fromObject({
            'version': 3,
            'file': 'file.d.ts',
            'sources': ['file.d.ts'],

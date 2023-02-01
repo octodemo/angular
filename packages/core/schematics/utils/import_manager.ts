@@ -7,12 +7,21 @@
  */
 
 import {dirname, resolve} from 'path';
-import * as ts from 'typescript';
+import ts from 'typescript';
+
+/** Whether the current TypeScript version is after 4.9. */
+const IS_AFTER_TS_49 = isAfterVersion(4, 9);
 
 /** Update recorder for managing imports. */
 export interface ImportManagerUpdateRecorder {
   addNewImport(start: number, importText: string): void;
   updateExistingImport(namedBindings: ts.NamedImports, newNamedBindings: string): void;
+}
+
+/** Possible types of quotes for imports. */
+const enum QuoteStyle {
+  Single,
+  Double,
 }
 
 /**
@@ -26,6 +35,15 @@ export class ImportManager {
       new Map<ts.ImportDeclaration, {propertyName?: ts.Identifier, importName: ts.Identifier}[]>();
   /** Map of source-files and their previously used identifier names. */
   private usedIdentifierNames = new Map<ts.SourceFile, string[]>();
+  /** Map of source files and the new imports that have to be added to them. */
+  private newImports: Map<ts.SourceFile, {
+    importStartIndex: number,
+    defaultImports: Map<string, ts.Identifier>,
+    namedImports: Map<string, ts.ImportSpecifier[]>,
+  }> = new Map();
+  /** Map between a file and the implied quote style for imports. */
+  private quoteStyles: Record<string, QuoteStyle> = {};
+
   /**
    * Array of previously resolved symbol imports. Cache can be re-used to return
    * the same identifier without checking the source-file again.
@@ -33,6 +51,7 @@ export class ImportManager {
   private importCache: {
     sourceFile: ts.SourceFile,
     symbolName: string|null,
+    alias: string|null,
     moduleName: string,
     identifier: ts.Identifier
   }[] = [];
@@ -47,7 +66,7 @@ export class ImportManager {
    */
   addImportToSourceFile(
       sourceFile: ts.SourceFile, symbolName: string|null, moduleName: string,
-      typeImport = false): ts.Expression {
+      alias: string|null = null, typeImport = false): ts.Expression {
     const sourceDir = dirname(sourceFile.fileName);
     let importStartIndex = 0;
     let existingImport: ts.ImportDeclaration|null = null;
@@ -56,7 +75,7 @@ export class ImportManager {
     // the previous generated identifier in order to avoid duplicate generated imports.
     const cachedImport = this.importCache.find(
         c => c.sourceFile === sourceFile && c.symbolName === symbolName &&
-            c.moduleName === moduleName);
+            c.moduleName === moduleName && c.alias === alias);
     if (cachedImport) {
       return cachedImport.identifier;
     }
@@ -91,16 +110,21 @@ export class ImportManager {
         // In case a "Type" symbol is imported, we can't use namespace imports
         // because these only export symbols available at runtime (no types)
         if (ts.isNamespaceImport(namedBindings) && !typeImport) {
-          return ts.createPropertyAccess(
-              ts.createIdentifier(namedBindings.name.text),
-              ts.createIdentifier(symbolName || 'default'));
+          return ts.factory.createPropertyAccessExpression(
+              ts.factory.createIdentifier(namedBindings.name.text),
+              ts.factory.createIdentifier(alias || symbolName || 'default'));
         } else if (ts.isNamedImports(namedBindings) && symbolName) {
-          const existingElement = namedBindings.elements.find(
-              e =>
-                  e.propertyName ? e.propertyName.text === symbolName : e.name.text === symbolName);
+          const existingElement = namedBindings.elements.find(e => {
+            // TODO(crisbeto): if an alias conflicts with an existing import, it may cause invalid
+            // code to be generated. This is unlikely, but we may want to revisit it in the future.
+            if (alias) {
+              return e.propertyName && e.name.text === alias && e.propertyName.text === symbolName;
+            }
+            return e.propertyName ? e.propertyName.text === symbolName : e.name.text === symbolName;
+          });
 
           if (existingElement) {
-            return ts.createIdentifier(existingElement.name.text);
+            return ts.factory.createIdentifier(existingElement.name.text);
           }
 
           // In case the symbol could not be found in an existing import, we
@@ -109,15 +133,12 @@ export class ImportManager {
           existingImport = statement;
         }
       } else if (statement.importClause.name && !symbolName) {
-        return ts.createIdentifier(statement.importClause.name.text);
+        return ts.factory.createIdentifier(statement.importClause.name.text);
       }
     }
 
     if (existingImport) {
-      const propertyIdentifier = ts.createIdentifier(symbolName!);
-      const generatedUniqueIdentifier = this._getUniqueIdentifier(sourceFile, symbolName!);
-      const needsGeneratedUniqueName = generatedUniqueIdentifier.text !== symbolName;
-      const importName = needsGeneratedUniqueName ? generatedUniqueIdentifier : propertyIdentifier;
+      const {propertyName, name} = this._getImportParts(sourceFile, symbolName!, alias);
 
       // Since it can happen that multiple classes need to be imported within the
       // specified source file and we want to add the identifiers to the existing
@@ -126,53 +147,45 @@ export class ImportManager {
       // would throw off the recorder offsets. We need to keep track of the new identifiers
       // for the import and perform the import transformation as batches per source-file.
       this.updatedImports.set(
-          existingImport, (this.updatedImports.get(existingImport) || []).concat({
-            propertyName: needsGeneratedUniqueName ? propertyIdentifier : undefined,
-            importName: importName,
-          }));
+          existingImport,
+          (this.updatedImports.get(existingImport) || []).concat({propertyName, importName: name}));
 
       // Keep track of all updated imports so that we don't generate duplicate
       // similar imports as these can't be statically analyzed in the source-file yet.
-      this.importCache.push({sourceFile, moduleName, symbolName, identifier: importName});
+      this.importCache.push({sourceFile, moduleName, symbolName, alias, identifier: name});
 
-      return importName;
+      return name;
     }
 
     let identifier: ts.Identifier|null = null;
-    let newImport: ts.ImportDeclaration|null = null;
 
-    if (symbolName) {
-      const propertyIdentifier = ts.createIdentifier(symbolName);
-      const generatedUniqueIdentifier = this._getUniqueIdentifier(sourceFile, symbolName);
-      const needsGeneratedUniqueName = generatedUniqueIdentifier.text !== symbolName;
-      identifier = needsGeneratedUniqueName ? generatedUniqueIdentifier : propertyIdentifier;
-
-      newImport = ts.createImportDeclaration(
-          undefined, undefined,
-          ts.createImportClause(
-              undefined,
-              ts.createNamedImports([ts.createImportSpecifier(
-                  needsGeneratedUniqueName ? propertyIdentifier : undefined, identifier)])),
-          ts.createStringLiteral(moduleName));
-    } else {
-      identifier = this._getUniqueIdentifier(sourceFile, 'defaultExport');
-      newImport = ts.createImportDeclaration(
-          undefined, undefined, ts.createImportClause(identifier, undefined),
-          ts.createStringLiteral(moduleName));
+    if (!this.newImports.has(sourceFile)) {
+      this.newImports.set(sourceFile, {
+        importStartIndex,
+        defaultImports: new Map(),
+        namedImports: new Map(),
+      });
     }
 
-    const newImportText = this.printer.printNode(ts.EmitHint.Unspecified, newImport, sourceFile);
-    // If the import is generated at the start of the source file, we want to add
-    // a new-line after the import. Otherwise if the import is generated after an
-    // existing import, we need to prepend a new-line so that the import is not on
-    // the same line as the existing import anchor.
-    this.getUpdateRecorder(sourceFile)
-        .addNewImport(
-            importStartIndex, importStartIndex === 0 ? `${newImportText}\n` : `\n${newImportText}`);
+    if (symbolName) {
+      const {propertyName, name} = this._getImportParts(sourceFile, symbolName, alias);
+      const importMap = this.newImports.get(sourceFile)!.namedImports;
+      identifier = propertyName || name;
+
+      if (!importMap.has(moduleName)) {
+        importMap.set(moduleName, []);
+      }
+
+      importMap.get(moduleName)!.push(ts.factory.createImportSpecifier(false, propertyName, name));
+    } else {
+      const importMap = this.newImports.get(sourceFile)!.defaultImports;
+      identifier = this._getUniqueIdentifier(sourceFile, 'defaultExport');
+      importMap.set(moduleName, identifier);
+    }
 
     // Keep track of all generated imports so that we don't generate duplicate
     // similar imports as these can't be statically analyzed in the source-file yet.
-    this.importCache.push({sourceFile, symbolName, moduleName, identifier});
+    this.importCache.push({sourceFile, symbolName, moduleName, alias, identifier});
 
     return identifier;
   }
@@ -187,14 +200,40 @@ export class ImportManager {
       const sourceFile = importDecl.getSourceFile();
       const recorder = this.getUpdateRecorder(sourceFile);
       const namedBindings = importDecl.importClause!.namedBindings as ts.NamedImports;
-      const newNamedBindings = ts.updateNamedImports(
+      const newNamedBindings = ts.factory.updateNamedImports(
           namedBindings,
           namedBindings.elements.concat(expressions.map(
-              ({propertyName, importName}) => ts.createImportSpecifier(propertyName, importName))));
+              ({propertyName, importName}) =>
+                  ts.factory.createImportSpecifier(false, propertyName, importName))));
 
       const newNamedBindingsText =
           this.printer.printNode(ts.EmitHint.Unspecified, newNamedBindings, sourceFile);
       recorder.updateExistingImport(namedBindings, newNamedBindingsText);
+    });
+
+    this.newImports.forEach(({importStartIndex, defaultImports, namedImports}, sourceFile) => {
+      const recorder = this.getUpdateRecorder(sourceFile);
+      const useSingleQuotes = this._getQuoteStyle(sourceFile) === QuoteStyle.Single;
+
+      defaultImports.forEach((identifier, moduleName) => {
+        const newImport = createImportDeclaration(
+            undefined, ts.factory.createImportClause(false, identifier, undefined),
+            ts.factory.createStringLiteral(moduleName, useSingleQuotes));
+
+        recorder.addNewImport(
+            importStartIndex, this._getNewImportText(importStartIndex, newImport, sourceFile));
+      });
+
+      namedImports.forEach((specifiers, moduleName) => {
+        const newImport = createImportDeclaration(
+            undefined,
+            ts.factory.createImportClause(
+                false, undefined, ts.factory.createNamedImports(specifiers)),
+            ts.factory.createStringLiteral(moduleName, useSingleQuotes));
+
+        recorder.addNewImport(
+            importStartIndex, this._getNewImportText(importStartIndex, newImport, sourceFile));
+      });
     });
   }
 
@@ -202,7 +241,7 @@ export class ImportManager {
   private _getUniqueIdentifier(sourceFile: ts.SourceFile, baseName: string): ts.Identifier {
     if (this.isUniqueIdentifierName(sourceFile, baseName)) {
       this._recordUsedIdentifier(sourceFile, baseName);
-      return ts.createIdentifier(baseName);
+      return ts.factory.createIdentifier(baseName);
     }
 
     let name = null;
@@ -212,7 +251,7 @@ export class ImportManager {
     } while (!this.isUniqueIdentifierName(sourceFile, name));
 
     this._recordUsedIdentifier(sourceFile, name!);
-    return ts.createIdentifier(name!);
+    return ts.factory.createIdentifier(name!);
   }
 
   /**
@@ -231,7 +270,10 @@ export class ImportManager {
     const nodeQueue: ts.Node[] = [sourceFile];
     while (nodeQueue.length) {
       const node = nodeQueue.shift()!;
-      if (ts.isIdentifier(node) && node.text === name) {
+      if (ts.isIdentifier(node) && node.text === name &&
+          // Identifiers that are aliased in an import aren't
+          // problematic since they're used under a different name.
+          (!ts.isImportSpecifier(node.parent) || node.parent.propertyName !== node)) {
         return false;
       }
       nodeQueue.push(...node.getChildren());
@@ -256,4 +298,97 @@ export class ImportManager {
     }
     return commentRanges[commentRanges.length - 1]!.end;
   }
+
+  /** Gets the text that should be added to the file for a newly-created import declaration. */
+  private _getNewImportText(
+      importStartIndex: number, newImport: ts.ImportDeclaration,
+      sourceFile: ts.SourceFile): string {
+    const text = this.printer.printNode(ts.EmitHint.Unspecified, newImport, sourceFile);
+
+    // If the import is generated at the start of the source file, we want to add
+    // a new-line after the import. Otherwise if the import is generated after an
+    // existing import, we need to prepend a new-line so that the import is not on
+    // the same line as the existing import anchor
+    return importStartIndex === 0 ? `${text}\n` : `\n${text}`;
+  }
+
+  /**
+   * Gets the different parts necessary to construct an import specifier.
+   * @param sourceFile File in which the import is being inserted.
+   * @param symbolName Name of the symbol.
+   * @param alias Alias that the symbol may be available under.
+   * @returns Object containing the different parts. E.g. `{name: 'alias', propertyName: 'name'}`
+   * would correspond to `import {name as alias}` while `{name: 'name', propertyName: undefined}`
+   * corresponds to `import {name}`.
+   */
+  private _getImportParts(sourceFile: ts.SourceFile, symbolName: string, alias: string|null) {
+    const symbolIdentifier = ts.factory.createIdentifier(symbolName);
+    const aliasIdentifier = alias ? ts.factory.createIdentifier(alias) : null;
+    const generatedUniqueIdentifier = this._getUniqueIdentifier(sourceFile, alias || symbolName);
+    const needsGeneratedUniqueName = generatedUniqueIdentifier.text !== (alias || symbolName);
+    let propertyName: ts.Identifier|undefined;
+    let name: ts.Identifier;
+
+    if (needsGeneratedUniqueName) {
+      propertyName = symbolIdentifier;
+      name = generatedUniqueIdentifier;
+    } else if (aliasIdentifier) {
+      propertyName = symbolIdentifier;
+      name = aliasIdentifier;
+    } else {
+      name = symbolIdentifier;
+    }
+
+    return {propertyName, name};
+  }
+
+  /** Gets the quote style that is used for a file's imports. */
+  private _getQuoteStyle(sourceFile: ts.SourceFile): QuoteStyle {
+    if (!this.quoteStyles.hasOwnProperty(sourceFile.fileName)) {
+      let quoteStyle: QuoteStyle|undefined;
+
+      // Walk through the top-level imports and try to infer the quotes.
+      for (const statement of sourceFile.statements) {
+        if (ts.isImportDeclaration(statement) &&
+            ts.isStringLiteralLike(statement.moduleSpecifier)) {
+          // Use `getText` instead of the actual text since it includes the quotes.
+          quoteStyle = statement.moduleSpecifier.getText().trim().startsWith('"') ?
+              QuoteStyle.Double :
+              QuoteStyle.Single;
+          break;
+        }
+      }
+
+      // Otherwise fall back to single quotes.
+      this.quoteStyles[sourceFile.fileName] = quoteStyle ?? QuoteStyle.Single;
+    }
+
+    return this.quoteStyles[sourceFile.fileName];
+  }
+}
+
+/**
+ * Creates a `ts.ImportDeclaration` declaration.
+ *
+ * TODO(crisbeto): this is a backwards-compatibility layer for versions of TypeScript less than 4.9.
+ * We should remove it once we have dropped support for the older versions.
+ */
+function createImportDeclaration(
+    modifiers: readonly ts.Modifier[]|undefined, importClause: ts.ImportClause|undefined,
+    moduleSpecifier: ts.Expression, assertClause?: ts.AssertClause): ts.ImportDeclaration {
+  return IS_AFTER_TS_49 ? (ts.factory.createImportDeclaration as any)(
+                              modifiers, importClause, moduleSpecifier, assertClause) :
+                          (ts.factory.createImportDeclaration as any)(
+                              undefined, modifiers, importClause, moduleSpecifier, assertClause);
+}
+
+/** Checks if the current version of TypeScript is after the specified major/minor versions. */
+function isAfterVersion(targetMajor: number, targetMinor: number): boolean {
+  const [major, minor] = ts.versionMajorMinor.split('.').map(part => parseInt(part));
+
+  if (major < targetMajor) {
+    return false;
+  }
+
+  return major === targetMajor ? minor >= targetMinor : true;
 }

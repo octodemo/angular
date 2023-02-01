@@ -1,6 +1,5 @@
+/* eslint-disable max-len */
 import { browser, by, element, logging, WebElement } from 'protractor';
-
-/* tslint:disable:max-line-length */
 
 describe('View Encapsulation App', () => {
 
@@ -93,5 +92,8 @@ describe('View Encapsulation App', () => {
 async function findShadowDomElement(shadowHostSelector: string, shadowElementSelector: string): Promise<WebElement> {
   const shadowHost = browser.findElement(by.css(shadowHostSelector));
   const shadowRoot: any = await browser.executeScript('return arguments[0].shadowRoot', shadowHost);
-  return shadowRoot.findElement(by.css(shadowElementSelector));
+  // Using this solution to find the shadow element after Chrome 97: https://stackoverflow.com/a/70611425.
+  const rootKey = Object.keys(shadowRoot)[0];
+  const rootId = shadowRoot[rootKey];
+  return new WebElement(browser, rootId).findElement(by.css(shadowElementSelector));
 }

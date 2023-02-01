@@ -6,12 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Injector} from '../di/injector';
 import {Type} from '../interface/type';
 import {stringify} from '../util/stringify';
 
-import {ComponentFactory, ComponentRef} from './component_factory';
-import {NgModuleRef} from './ng_module_factory';
+import {ComponentFactory} from './component_factory';
 
 export function noComponentFactoryError(component: Function) {
   const error = Error(`No component factory found for ${
@@ -39,11 +37,14 @@ class _NullComponentFactoryResolver implements ComponentFactoryResolver {
  * Use to obtain the factory for a given component type,
  * then use the factory's `create()` method to create a component of that type.
  *
- * @see [Dynamic Components](guide/dynamic-component-loader)
- * @see [Usage Example](guide/dynamic-component-loader#resolving-components)
- * @see <live-example name="dynamic-component-loader" noDownload></live-example>
-of the code in this cookbook
+ * Note: since v13, dynamic component creation via
+ * [`ViewContainerRef.createComponent`](api/core/ViewContainerRef#createComponent)
+ * does **not** require resolving component factory: component class can be used directly.
+ *
  * @publicApi
+ *
+ * @deprecated Angular no longer requires Component factories. Please use other APIs where
+ *     Component class can be used directly.
  */
 export abstract class ComponentFactoryResolver {
   static NULL: ComponentFactoryResolver = (/* @__PURE__ */ new _NullComponentFactoryResolver());
@@ -52,52 +53,4 @@ export abstract class ComponentFactoryResolver {
    * @param component The component type.
    */
   abstract resolveComponentFactory<T>(component: Type<T>): ComponentFactory<T>;
-}
-
-export class CodegenComponentFactoryResolver implements ComponentFactoryResolver {
-  private _factories = new Map<any, ComponentFactory<any>>();
-
-  constructor(
-      factories: ComponentFactory<any>[], private _parent: ComponentFactoryResolver,
-      private _ngModule: NgModuleRef<any>) {
-    for (let i = 0; i < factories.length; i++) {
-      const factory = factories[i];
-      this._factories.set(factory.componentType, factory);
-    }
-  }
-
-  resolveComponentFactory<T>(component: {new(...args: any[]): T}): ComponentFactory<T> {
-    let factory = this._factories.get(component);
-    if (!factory && this._parent) {
-      factory = this._parent.resolveComponentFactory(component);
-    }
-    if (!factory) {
-      throw noComponentFactoryError(component);
-    }
-    return new ComponentFactoryBoundToModule(factory, this._ngModule);
-  }
-}
-
-export class ComponentFactoryBoundToModule<C> extends ComponentFactory<C> {
-  override readonly selector: string;
-  override readonly componentType: Type<any>;
-  override readonly ngContentSelectors: string[];
-  override readonly inputs: {propName: string, templateName: string}[];
-  override readonly outputs: {propName: string, templateName: string}[];
-
-  constructor(private factory: ComponentFactory<C>, private ngModule: NgModuleRef<any>) {
-    super();
-    this.selector = factory.selector;
-    this.componentType = factory.componentType;
-    this.ngContentSelectors = factory.ngContentSelectors;
-    this.inputs = factory.inputs;
-    this.outputs = factory.outputs;
-  }
-
-  override create(
-      injector: Injector, projectableNodes?: any[][], rootSelectorOrNode?: string|any,
-      ngModule?: NgModuleRef<any>): ComponentRef<C> {
-    return this.factory.create(
-        injector, projectableNodes, rootSelectorOrNode, ngModule || this.ngModule);
-  }
 }

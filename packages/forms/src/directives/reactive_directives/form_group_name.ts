@@ -6,9 +6,9 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Directive, forwardRef, Host, Inject, Input, OnDestroy, OnInit, Optional, Self, SkipSelf} from '@angular/core';
+import {Directive, forwardRef, Host, Inject, Input, OnDestroy, OnInit, Optional, Provider, Self, SkipSelf} from '@angular/core';
 
-import {FormArray} from '../../model';
+import {FormArray} from '../../model/form_array';
 import {NG_ASYNC_VALIDATORS, NG_VALIDATORS} from '../../validators';
 import {AbstractFormGroupDirective} from '../abstract_form_group_directive';
 import {ControlContainer} from '../control_container';
@@ -18,7 +18,7 @@ import {AsyncValidator, AsyncValidatorFn, Validator, ValidatorFn} from '../valid
 
 import {FormGroupDirective} from './form_group_directive';
 
-export const formGroupNameProvider: any = {
+const formGroupNameProvider: Provider = {
   provide: ControlContainer,
   useExisting: forwardRef(() => FormGroupName)
 };
@@ -26,12 +26,12 @@ export const formGroupNameProvider: any = {
 /**
  * @description
  *
- * Syncs a nested `FormGroup` to a DOM element.
+ * Syncs a nested `FormGroup` or `FormRecord` to a DOM element.
  *
  * This directive can only be used with a parent `FormGroupDirective`.
  *
- * It accepts the string name of the nested `FormGroup` to link, and
- * looks for a `FormGroup` registered with that name in the parent
+ * It accepts the string name of the nested `FormGroup` or `FormRecord` to link, and
+ * looks for a `FormGroup` or `FormRecord` registered with that name in the parent
  * `FormGroup` instance you passed into `FormGroupDirective`.
  *
  * Use nested form groups to validate a sub-group of a
@@ -44,7 +44,7 @@ export const formGroupNameProvider: any = {
  *
  * ### Access the group by name
  *
- * The following example uses the {@link AbstractControl#get get} method to access the
+ * The following example uses the `AbstractControl.get` method to access the
  * associated `FormGroup`
  *
  * ```ts
@@ -53,7 +53,7 @@ export const formGroupNameProvider: any = {
  *
  * ### Access individual controls in the group
  *
- * The following example uses the {@link AbstractControl#get get} method to access
+ * The following example uses the `AbstractControl.get` method to access
  * individual controls within the group using dot syntax.
  *
  * ```ts

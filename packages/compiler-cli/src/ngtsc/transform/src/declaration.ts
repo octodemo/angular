@@ -7,7 +7,7 @@
  */
 
 import {Type} from '@angular/compiler';
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {ImportRewriter} from '../../imports';
 import {ClassDeclaration} from '../../reflection';
@@ -140,9 +140,8 @@ class DtsTransformer {
     // If some elements have been transformed but the class itself has not been transformed, create
     // an updated class declaration with the updated elements.
     if (elementsChanged && clazz === newClazz) {
-      newClazz = ts.updateClassDeclaration(
+      newClazz = ts.factory.updateClassDeclaration(
           /* node */ clazz,
-          /* decorators */ clazz.decorators,
           /* modifiers */ clazz.modifiers,
           /* name */ clazz.name,
           /* typeParameters */ clazz.typeParameters,
@@ -191,11 +190,10 @@ export class IvyDeclarationDtsTransform implements DtsTransform {
     const fields = this.declarationFields.get(original)!;
 
     const newMembers = fields.map(decl => {
-      const modifiers = [ts.createModifier(ts.SyntaxKind.StaticKeyword)];
+      const modifiers = [ts.factory.createModifier(ts.SyntaxKind.StaticKeyword)];
       const typeRef = translateType(decl.type, imports);
       markForEmitAsSingleLine(typeRef);
-      return ts.createProperty(
-          /* decorators */ undefined,
+      return ts.factory.createPropertyDeclaration(
           /* modifiers */ modifiers,
           /* name */ decl.name,
           /* questionOrExclamationToken */ undefined,
@@ -203,9 +201,8 @@ export class IvyDeclarationDtsTransform implements DtsTransform {
           /* initializer */ undefined);
     });
 
-    return ts.updateClassDeclaration(
+    return ts.factory.updateClassDeclaration(
         /* node */ clazz,
-        /* decorators */ clazz.decorators,
         /* modifiers */ clazz.modifiers,
         /* name */ clazz.name,
         /* typeParameters */ clazz.typeParameters,

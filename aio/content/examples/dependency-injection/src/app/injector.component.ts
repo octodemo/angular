@@ -21,9 +21,7 @@ import { Logger } from './logger.service';
 export class InjectorComponent {
   car: Car;
 
-  // #docregion get-hero-service
   heroService: HeroService;
-  // #enddocregion get-hero-service
   hero: Hero;
 
   constructor(private injector: Injector) {
@@ -33,7 +31,7 @@ export class InjectorComponent {
   }
 
   get rodent() {
-    const rousDontExist = `R.O.U.S.'s? I don't think they exist!`;
+    const rousDontExist = "R.O.U.S.'s? I don't think they exist!";
     return this.injector.get(ROUS, rousDontExist);
   }
 }

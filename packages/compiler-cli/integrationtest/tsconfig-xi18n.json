@@ -1,21 +1,20 @@
 {
   "angularCompilerOptions": {
     "debug": true,
-    "enableSummariesForJit": true,
-    "enableIvy": false
+    "enableSummariesForJit": true
   },
 
   "compilerOptions": {
     "baseUrl": ".",
     "declaration": true,
     "experimentalDecorators": true,
-    "lib": ["es6", "dom"],
+    "lib": ["es2015", "dom"],
     "moduleResolution": "node",
     "noImplicitAny": true,
     "outDir": "./xi18n-out",
     "rootDir": "",
     "skipLibCheck": true,
-    "target": "es5",
+    "target": "es2015",
     "typeRoots": ["node_modules/@types"]
   },
 
@@ -23,6 +22,5 @@
     "src/module",
     "src/bootstrap",
     "test/all_spec",
-    "test/test_ngtools_api"
   ]
 }

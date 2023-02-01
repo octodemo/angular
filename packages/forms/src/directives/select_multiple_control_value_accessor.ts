@@ -6,11 +6,13 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Directive, ElementRef, forwardRef, Host, Input, OnDestroy, Optional, Renderer2, StaticProvider} from '@angular/core';
+import {Directive, ElementRef, forwardRef, Host, Input, OnDestroy, Optional, Provider, Renderer2, ɵRuntimeError as RuntimeError} from '@angular/core';
+
+import {RuntimeErrorCode} from '../errors';
 
 import {BuiltInControlValueAccessor, ControlValueAccessor, NG_VALUE_ACCESSOR} from './control_value_accessor';
 
-export const SELECT_MULTIPLE_VALUE_ACCESSOR: StaticProvider = {
+const SELECT_MULTIPLE_VALUE_ACCESSOR: Provider = {
   provide: NG_VALUE_ACCESSOR,
   useExisting: forwardRef(() => SelectMultipleControlValueAccessor),
   multi: true
@@ -103,7 +105,9 @@ export class SelectMultipleControlValueAccessor extends BuiltInControlValueAcces
   @Input()
   set compareWith(fn: (o1: any, o2: any) => boolean) {
     if (typeof fn !== 'function' && (typeof ngDevMode === 'undefined' || ngDevMode)) {
-      throw new Error(`compareWith must be a function, but received ${JSON.stringify(fn)}`);
+      throw new RuntimeError(
+          RuntimeErrorCode.COMPAREWITH_NOT_A_FN,
+          `compareWith must be a function, but received ${JSON.stringify(fn)}`);
     }
     this._compareWith = fn;
   }
@@ -137,23 +141,26 @@ export class SelectMultipleControlValueAccessor extends BuiltInControlValueAcces
    * @nodoc
    */
   override registerOnChange(fn: (value: any) => any): void {
-    this.onChange = (_: any) => {
+    this.onChange = (element: HTMLSelectElement) => {
       const selected: Array<any> = [];
-      if (_.selectedOptions !== undefined) {
-        const options: HTMLCollection = _.selectedOptions;
+      const selectedOptions = element.selectedOptions;
+      if (selectedOptions !== undefined) {
+        const options = selectedOptions;
         for (let i = 0; i < options.length; i++) {
-          const opt: any = options.item(i);
-          const val: any = this._getOptionValue(opt.value);
+          const opt = options[i];
+          const val = this._getOptionValue(opt.value);
           selected.push(val);
         }
       }
-      // Degrade on IE
+      // Degrade to use `options` when `selectedOptions` property is not available.
+      // Note: the `selectedOptions` is available in all supported browsers, but the Domino lib
+      // doesn't have it currently, see https://github.com/fgnass/domino/issues/177.
       else {
-        const options: HTMLCollection = <HTMLCollection>_.options;
+        const options = element.options;
         for (let i = 0; i < options.length; i++) {
-          const opt: HTMLOption = options.item(i);
+          const opt = options[i];
           if (opt.selected) {
-            const val: any = this._getOptionValue(opt.value);
+            const val = this._getOptionValue(opt.value);
             selected.push(val);
           }
         }

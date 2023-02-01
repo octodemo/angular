@@ -15,13 +15,14 @@ export * from './metadata';
 export * from './version';
 export {TypeDecorator} from './util/decorators';
 export * from './di';
-export {createPlatform, assertPlatform, destroyPlatform, getPlatform, PlatformRef, ApplicationRef, createPlatformFactory, NgProbeToken} from './application_ref';
+export {createPlatform, assertPlatform, destroyPlatform, getPlatform, BootstrapOptions, PlatformRef, ApplicationRef, createPlatformFactory, NgProbeToken} from './application_ref';
 export {enableProdMode, isDevMode} from './util/is_dev_mode';
-export {APP_ID, PACKAGE_ROOT_URL, PLATFORM_INITIALIZER, PLATFORM_ID, APP_BOOTSTRAP_LISTENER} from './application_tokens';
+export {APP_ID, PACKAGE_ROOT_URL, PLATFORM_INITIALIZER, PLATFORM_ID, APP_BOOTSTRAP_LISTENER, ANIMATION_MODULE_TYPE} from './application_tokens';
 export {APP_INITIALIZER, ApplicationInitStatus} from './application_init';
 export * from './zone';
 export * from './render';
 export * from './linker';
+export * from './linker/ng_module_factory_loader_impl';
 export {DebugElement, DebugEventListener, DebugNode, asNativeElements, getDebugNode, Predicate} from './debug/debug_node';
 export {GetTestability, Testability, TestabilityRegistry, setTestabilityGetter} from './testability/testability';
 export * from './change_detection';
@@ -35,7 +36,9 @@ export * from './core_private_export';
 export * from './core_render3_private_export';
 export {SecurityContext} from './sanitization/security';
 export {Sanitizer} from './sanitization/sanitizer';
-export * from './codegen_private_exports';
+export {createNgModule, createNgModuleRef, createEnvironmentInjector} from './render3/ng_module_ref';
+export {createComponent, reflectComponentType, ComponentMirror} from './render3/component';
+export {isStandalone} from './render3/definition';
 
 import {global} from './util/global';
 if (typeof ngDevMode !== 'undefined' && ngDevMode) {

@@ -5,12 +5,11 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import {compileClassMetadata, ConstantPool, R3ClassMetadata, R3DeclareClassMetadata, R3PartialDeclaration} from '@angular/compiler';
-import * as o from '@angular/compiler/src/output/output_ast';
+import {compileClassMetadata, ConstantPool, outputAst as o, R3ClassMetadata, R3DeclareClassMetadata, R3PartialDeclaration} from '@angular/compiler';
 
 import {AstObject} from '../../ast/ast_value';
 
-import {PartialLinker} from './partial_linker';
+import {LinkedDefinition, PartialLinker} from './partial_linker';
 
 /**
  * A `PartialLinker` that is designed to process `ɵɵngDeclareClassMetadata()` call expressions.
@@ -18,9 +17,12 @@ import {PartialLinker} from './partial_linker';
 export class PartialClassMetadataLinkerVersion1<TExpression> implements PartialLinker<TExpression> {
   linkPartialDeclaration(
       constantPool: ConstantPool,
-      metaObj: AstObject<R3PartialDeclaration, TExpression>): o.Expression {
+      metaObj: AstObject<R3PartialDeclaration, TExpression>): LinkedDefinition {
     const meta = toR3ClassMetadata(metaObj);
-    return compileClassMetadata(meta);
+    return {
+      expression: compileClassMetadata(meta),
+      statements: [],
+    };
   }
 }
 

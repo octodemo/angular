@@ -6,14 +6,13 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {assertDomNode, assertGreaterThan, assertGreaterThanOrEqual, assertIndexInRange, assertLessThan} from '../../util/assert';
+import {assertGreaterThan, assertGreaterThanOrEqual, assertIndexInRange, assertLessThan} from '../../util/assert';
 import {assertTNode, assertTNodeForLView} from '../assert';
 import {LContainer, TYPE} from '../interfaces/container';
 import {TConstants, TNode} from '../interfaces/node';
-import {isProceduralRenderer} from '../interfaces/renderer';
 import {RNode} from '../interfaces/renderer_dom';
 import {isLContainer, isLView} from '../interfaces/type_checks';
-import {FLAGS, HEADER_OFFSET, HOST, LView, LViewFlags, PARENT, PREORDER_HOOK_FLAGS, RENDERER, TData, TRANSPLANTED_VIEWS_TO_REFRESH, TView} from '../interfaces/view';
+import {FLAGS, HEADER_OFFSET, HOST, LView, LViewFlags, PARENT, PREORDER_HOOK_FLAGS, TData, TRANSPLANTED_VIEWS_TO_REFRESH, TView} from '../interfaces/view';
 
 
 
@@ -60,20 +59,6 @@ export function unwrapLView(value: RNode|LView|LContainer): LView|null {
 }
 
 /**
- * Returns `LContainer` or `null` if not found.
- * @param value wrapped value of `RNode`, `LView`, `LContainer`
- */
-export function unwrapLContainer(value: RNode|LView|LContainer): LContainer|null {
-  while (Array.isArray(value)) {
-    // This check is same as `isLContainer()` but we don't call at as we don't want to call
-    // `Array.isArray()` twice and give JITer more work for inlining.
-    if (value[TYPE] === true) return value as LContainer;
-    value = value[HOST] as any;
-  }
-  return null;
-}
-
-/**
  * Retrieves an element value from the provided `viewData`, by unwrapping
  * from any containers, component views, or style contexts.
  */
@@ -95,7 +80,6 @@ export function getNativeByTNode(tNode: TNode, lView: LView): RNode {
   ngDevMode && assertTNodeForLView(tNode, lView);
   ngDevMode && assertIndexInRange(lView, tNode.index);
   const node: RNode = unwrapRNode(lView[tNode.index]);
-  ngDevMode && !isProceduralRenderer(lView[RENDERER]) && assertDomNode(node);
   return node;
 }
 
@@ -112,7 +96,6 @@ export function getNativeByTNodeOrNull(tNode: TNode|null, lView: LView): RNode|n
   if (index !== -1) {
     ngDevMode && assertTNodeForLView(tNode!, lView);
     const node: RNode|null = unwrapRNode(lView[index]);
-    ngDevMode && node !== null && !isProceduralRenderer(lView[RENDERER]) && assertDomNode(node);
     return node;
   }
   return null;

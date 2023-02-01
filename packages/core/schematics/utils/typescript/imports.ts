@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 export type Import = {
   name: string,
@@ -62,12 +62,14 @@ export function getImportOfIdentifier(typeChecker: ts.TypeChecker, node: ts.Iden
  *    their original name.
  */
 export function getImportSpecifier(
-    sourceFile: ts.SourceFile, moduleName: string, specifierName: string): ts.ImportSpecifier|null {
+    sourceFile: ts.SourceFile, moduleName: string|RegExp,
+    specifierName: string): ts.ImportSpecifier|null {
   for (const node of sourceFile.statements) {
-    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) &&
-        node.moduleSpecifier.text === moduleName) {
-      const namedBindings = node.importClause && node.importClause.namedBindings;
-      if (namedBindings && ts.isNamedImports(namedBindings)) {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      const isMatch = typeof moduleName === 'string' ? node.moduleSpecifier.text === moduleName :
+                                                       moduleName.test(node.moduleSpecifier.text);
+      const namedBindings = node.importClause?.namedBindings;
+      if (isMatch && namedBindings && ts.isNamedImports(namedBindings)) {
         const match = findImportSpecifier(namedBindings.elements, specifierName);
         if (match) {
           return match;
@@ -82,6 +84,7 @@ export function getImportSpecifier(
 
 /**
  * Replaces an import inside a named imports node with a different one.
+ *
  * @param node Node that contains the imports.
  * @param existingImport Import that should be replaced.
  * @param newImportName Import that should be inserted.
@@ -98,16 +101,31 @@ export function replaceImport(
     return node;
   }
 
-  return ts.updateNamedImports(node, [
+  const importPropertyName =
+      existingImportNode.propertyName ? ts.factory.createIdentifier(newImportName) : undefined;
+  const importName = existingImportNode.propertyName ? existingImportNode.name :
+                                                       ts.factory.createIdentifier(newImportName);
+
+  return ts.factory.updateNamedImports(node, [
     ...node.elements.filter(current => current !== existingImportNode),
     // Create a new import while trying to preserve the alias of the old one.
-    ts.createImportSpecifier(
-        existingImportNode.propertyName ? ts.createIdentifier(newImportName) : undefined,
-        existingImportNode.propertyName ? existingImportNode.name :
-                                          ts.createIdentifier(newImportName))
+    ts.factory.createImportSpecifier(false, importPropertyName, importName)
   ]);
 }
 
+/**
+ * Removes a symbol from the named imports and updates a node
+ * that represents a given named imports.
+ *
+ * @param node Node that contains the imports.
+ * @param symbol Symbol that should be removed.
+ * @returns An updated node (ts.NamedImports).
+ */
+export function removeSymbolFromNamedImports(node: ts.NamedImports, symbol: ts.ImportSpecifier) {
+  return ts.factory.updateNamedImports(node, [
+    ...node.elements.filter(current => current !== symbol),
+  ]);
+}
 
 /** Finds an import specifier with a particular name. */
 export function findImportSpecifier(

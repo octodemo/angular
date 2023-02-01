@@ -5,15 +5,14 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import {INITIAL_CONFIG, PlatformConfig} from './tokens';
 
-
-const xhr2: any = require('xhr2');
-
-import {Injectable, Injector, Provider} from '@angular/core';
 import {PlatformLocation, XhrFactory} from '@angular/common';
-import {HttpEvent, HttpRequest, HttpHandler, HttpBackend, ɵHttpInterceptingHandler as HttpInterceptingHandler} from '@angular/common/http';
+import {HttpBackend, HttpEvent, HttpHandler, HttpRequest, ɵHttpInterceptorHandler as HttpInterceptorHandler} from '@angular/common/http';
+import {EnvironmentInjector, inject, Injectable, Provider} from '@angular/core';
 import {Observable, Observer, Subscription} from 'rxjs';
+import * as xhr2 from 'xhr2';
+
+import {INITIAL_CONFIG, PlatformConfig} from './tokens';
 
 // @see https://www.w3.org/Protocols/HTTP/1.1/draft-ietf-http-v11-spec-01#URI-syntax
 const isAbsoluteUrl = /^[a-zA-Z\-\+.]+:\/\//;
@@ -129,17 +128,17 @@ export class ZoneClientBackend extends
   }
 }
 
-export function zoneWrappedInterceptingHandler(
-    backend: HttpBackend, injector: Injector, platformLocation: PlatformLocation,
-    config: PlatformConfig) {
-  const realBackend: HttpBackend = new HttpInterceptingHandler(backend, injector);
-  return new ZoneClientBackend(realBackend, platformLocation, config);
+export function zoneWrappedInterceptorHandler(
+    platformLocation: PlatformLocation, config: PlatformConfig) {
+  return new ZoneClientBackend(
+      new HttpInterceptorHandler(inject(HttpBackend), inject(EnvironmentInjector)),
+      platformLocation, config);
 }
 
 export const SERVER_HTTP_PROVIDERS: Provider[] = [
   {provide: XhrFactory, useClass: ServerXhr}, {
     provide: HttpHandler,
-    useFactory: zoneWrappedInterceptingHandler,
-    deps: [HttpBackend, Injector, PlatformLocation, INITIAL_CONFIG]
+    useFactory: zoneWrappedInterceptorHandler,
+    deps: [PlatformLocation, INITIAL_CONFIG]
   }
 ];

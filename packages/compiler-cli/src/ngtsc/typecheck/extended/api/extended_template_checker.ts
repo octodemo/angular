@@ -6,11 +6,12 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
+
 import {TemplateDiagnostic} from '../../api';
 
 /**
- * Interface to generate extended template diangostics from the component tempaltes.
+ * Interface to generate extended template diagnostics from the component templates.
  */
 export interface ExtendedTemplateChecker {
   /**

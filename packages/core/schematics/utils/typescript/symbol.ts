@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 export function getValueSymbolOfDeclaration(node: ts.Node, typeChecker: ts.TypeChecker): ts.Symbol|
     undefined {
@@ -24,8 +24,8 @@ export function isReferenceToImport(
     typeChecker: ts.TypeChecker, node: ts.Node, importSpecifier: ts.ImportSpecifier): boolean {
   const nodeSymbol = typeChecker.getTypeAtLocation(node).getSymbol();
   const importSymbol = typeChecker.getTypeAtLocation(importSpecifier).getSymbol();
-  return !!(nodeSymbol && importSymbol) &&
-      nodeSymbol.valueDeclaration === importSymbol.valueDeclaration;
+  return !!(nodeSymbol?.declarations?.[0] && importSymbol?.declarations?.[0]) &&
+      nodeSymbol.declarations[0] === importSymbol.declarations[0];
 }
 
 /** Checks whether a node's type is nullable (`null`, `undefined` or `void`). */
@@ -41,7 +41,7 @@ export function isNullableType(typeChecker: ts.TypeChecker, node: ts.Node) {
   let hasSeenNullableType = false;
 
   // Trace the type of the node back to a type node, walk
-  // through all of its sub-nodes and look for nullable tyes.
+  // through all of its sub-nodes and look for nullable types.
   if (typeNode) {
     (function walk(current: ts.Node) {
       if (current.kind === ts.SyntaxKind.NullKeyword ||

@@ -5,7 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import {PluginObj, transformSync} from '@babel/core';
+import babel, {PluginObj} from '@babel/core';
 
 import {needsLinking} from '../../../linker';
 import {createEs2015LinkerPlugin} from '../../../linker/babel';
@@ -89,7 +89,7 @@ function applyLinker(
   if (!filename.endsWith('.js') || !needsLinking(filename, source)) {
     return {linkedSource: source, linkedSourceMap: sourceMap};
   }
-  const result = transformSync(source, {
+  const result = babel.transformSync(source, {
     cwd,
     filename,
     sourceMaps: !!sourceMap,

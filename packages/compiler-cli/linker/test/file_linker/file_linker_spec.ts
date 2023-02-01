@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import * as o from '@angular/compiler/src/output/output_ast';
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {MockFileSystemNative} from '../../../src/ngtsc/file_system/testing';
 import {MockLogger} from '../../../src/ngtsc/logging/testing';
@@ -98,7 +98,10 @@ describe('FileLinker', () => {
     it('should call `linkPartialDeclaration()` on the appropriate partial compiler', () => {
       const {fileLinker} = createFileLinker();
       const compileSpy = spyOn(PartialDirectiveLinkerVersion1.prototype, 'linkPartialDeclaration')
-                             .and.returnValue(o.literal('compilation result'));
+                             .and.returnValue({
+                               expression: o.literal('compilation result'),
+                               statements: [],
+                             });
 
       const ngImport = factory.createIdentifier('core');
       const version = factory.createLiteral('0.0.0-PLACEHOLDER');
@@ -225,6 +228,9 @@ function spyOnLinkPartialDeclarationWithConstants(replacement: o.Expression) {
                       // We have to add the constant twice or it will not create a shared statement
                       constantPool.getConstLiteral(constArray);
                       constantPool.getConstLiteral(constArray);
-                      return replacement;
+                      return {
+                        expression: replacement,
+                        statements: [],
+                      };
                     }) as typeof PartialDirectiveLinkerVersion1.prototype.linkPartialDeclaration);
 }

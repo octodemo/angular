@@ -12,60 +12,29 @@
 //
 // no code actually imports these symbols from the @angular/core entry point
 export {
-  compileNgModuleFactory__POST_R3__ as ɵcompileNgModuleFactory__POST_R3__,
-  isBoundToModule__POST_R3__ as ɵisBoundToModule__POST_R3__
+  compileNgModuleFactory as ɵcompileNgModuleFactory,
+  isBoundToModule as ɵisBoundToModule
 } from './application_ref';
 export {
-  SWITCH_CHANGE_DETECTOR_REF_FACTORY__POST_R3__ as ɵSWITCH_CHANGE_DETECTOR_REF_FACTORY__POST_R3__,
+  injectChangeDetectorRef as ɵinjectChangeDetectorRef,
 } from './change_detection/change_detector_ref';
 export {
-  getDebugNode__POST_R3__ as ɵgetDebugNode__POST_R3__,
+  getDebugNode as ɵgetDebugNode,
 } from './debug/debug_node';
-export {
-  SWITCH_COMPILE_INJECTABLE__POST_R3__ as ɵSWITCH_COMPILE_INJECTABLE__POST_R3__,
-} from './di/injectable';
-export {INJECTOR_IMPL__POST_R3__ as ɵINJECTOR_IMPL__POST_R3__} from './di/injector';
 export {
   NG_INJ_DEF as ɵNG_INJ_DEF,
   NG_PROV_DEF as ɵNG_PROV_DEF,
+  isInjectable as ɵisInjectable,
 } from './di/interface/defs';
-export {CREATE_ATTRIBUTE_DECORATOR__POST_R3__ as ɵCREATE_ATTRIBUTE_DECORATOR__POST_R3__} from './di/metadata_attr';
-export {createInjector as ɵcreateInjector} from './di/r3_injector';
+export {createInjector as ɵcreateInjector} from './di/create_injector';
 export {
-  SWITCH_IVY_ENABLED__POST_R3__ as ɵSWITCH_IVY_ENABLED__POST_R3__,
-} from './ivy_switch';
-export {
-  Compiler_compileModuleAndAllComponentsAsync__POST_R3__ as ɵCompiler_compileModuleAndAllComponentsAsync__POST_R3__,
-  Compiler_compileModuleAndAllComponentsSync__POST_R3__ as ɵCompiler_compileModuleAndAllComponentsSync__POST_R3__,
-  Compiler_compileModuleAsync__POST_R3__ as ɵCompiler_compileModuleAsync__POST_R3__,
-  Compiler_compileModuleSync__POST_R3__ as ɵCompiler_compileModuleSync__POST_R3__,
-} from './linker/compiler';
-export {
-  SWITCH_ELEMENT_REF_FACTORY__POST_R3__ as ɵSWITCH_ELEMENT_REF_FACTORY__POST_R3__,
-} from './linker/element_ref';
-export { getModuleFactory__POST_R3__ as ɵgetModuleFactory__POST_R3__ } from './linker/ng_module_factory_loader';
-export { registerNgModuleType as ɵregisterNgModuleType } from './linker/ng_module_factory_registration';
-export {
-  SWITCH_TEMPLATE_REF_FACTORY__POST_R3__ as ɵSWITCH_TEMPLATE_REF_FACTORY__POST_R3__,
-} from './linker/template_ref';
-export {
-  SWITCH_VIEW_CONTAINER_REF_FACTORY__POST_R3__ as ɵSWITCH_VIEW_CONTAINER_REF_FACTORY__POST_R3__,
-} from './linker/view_container_ref';
-export {
-  SWITCH_COMPILE_COMPONENT__POST_R3__ as ɵSWITCH_COMPILE_COMPONENT__POST_R3__,
-  SWITCH_COMPILE_DIRECTIVE__POST_R3__ as ɵSWITCH_COMPILE_DIRECTIVE__POST_R3__,
-  SWITCH_COMPILE_PIPE__POST_R3__ as ɵSWITCH_COMPILE_PIPE__POST_R3__,
-} from './metadata/directives';
-export {
-  SWITCH_COMPILE_NGMODULE__POST_R3__ as ɵSWITCH_COMPILE_NGMODULE__POST_R3__,
-} from './metadata/ng_module';
+  registerNgModuleType as ɵɵregisterNgModuleType,
+  setAllowDuplicateNgModuleIdsForTest as ɵsetAllowDuplicateNgModuleIdsForTest,
+} from './linker/ng_module_registration';
 export {
   NgModuleDef as ɵNgModuleDef,
   NgModuleTransitiveScopes as ɵNgModuleTransitiveScopes,
 } from './metadata/ng_module_def';
-export {
-  SWITCH_RENDERER2_FACTORY__POST_R3__ as ɵSWITCH_RENDERER2_FACTORY__POST_R3__,
-} from './render/api';
 export {
   getLContext as ɵgetLContext
 } from './render3/context_discovery';
@@ -89,18 +58,15 @@ export {
   getDirectives as ɵgetDirectives,
   getHostElement as ɵgetHostElement,
   LifecycleHooksFeature as ɵLifecycleHooksFeature,
-  markDirty as ɵmarkDirty,
   NgModuleFactory as ɵNgModuleFactory,
   NgModuleRef as ɵRender3NgModuleRef,
   NgModuleType as ɵNgModuleType,
   NO_CHANGE as ɵNO_CHANGE,
   PipeDef as ɵPipeDef,
-  renderComponent as ɵrenderComponent,
   RenderFlags as ɵRenderFlags,
   setClassMetadata as ɵsetClassMetadata,
   setLocaleId as ɵsetLocaleId,
   store as ɵstore,
-  whenRendered as ɵwhenRendered,
   ɵɵadvance,
   ɵɵattribute,
   ɵɵattributeInterpolate1,
@@ -184,6 +150,7 @@ export {
   ɵɵpropertyInterpolate8,
   ɵɵpropertyInterpolateV,
   ɵɵProvidersFeature,
+  ɵɵHostDirectivesFeature,
   ɵɵpureFunction0,
   ɵɵpureFunction1,
   ɵɵpureFunction2,
@@ -196,6 +163,7 @@ export {
   ɵɵpureFunctionV,
   ɵɵqueryRefresh,
   ɵɵreference,
+  ɵɵresetView,
   ɵɵresolveBody,
   ɵɵresolveDocument,
   ɵɵresolveWindow,
@@ -203,6 +171,7 @@ export {
 
   ɵɵsetComponentScope,
   ɵɵsetNgModuleScope,
+  ɵɵStandaloneFeature,
   ɵɵstyleMap,
   ɵɵstyleMapInterpolate1,
   ɵɵstyleMapInterpolate2,
@@ -239,6 +208,10 @@ export {
   ɵɵtextInterpolate8,
   ɵɵtextInterpolateV,
   ɵɵviewQuery,
+  ɵgetUnknownElementStrictMode,
+  ɵsetUnknownElementStrictMode,
+  ɵgetUnknownPropertyStrictMode,
+  ɵsetUnknownPropertyStrictMode
 } from './render3/index';
 export {
   LContext as ɵLContext,
@@ -246,12 +219,6 @@ export {
 export {
   setDocument as ɵsetDocument
 } from './render3/interfaces/document';
-export {
-  Player as ɵPlayer,
-  PlayerFactory as ɵPlayerFactory,
-  PlayerHandler as ɵPlayerHandler,
-  PlayState as ɵPlayState,
-} from './render3/interfaces/player';
 export {
   compileComponent as ɵcompileComponent,
   compileDirective as ɵcompileDirective,
@@ -286,6 +253,7 @@ export {
   publishDefaultGlobalUtils as ɵpublishDefaultGlobalUtils
 ,
   publishGlobalUtil as ɵpublishGlobalUtil} from './render3/util/global_utils';
+export {ViewRef as ɵViewRef} from './render3/view_ref';
 export {
   bypassSanitizationTrustHtml as ɵbypassSanitizationTrustHtml,
   bypassSanitizationTrustResourceUrl as ɵbypassSanitizationTrustResourceUrl,
@@ -303,6 +271,9 @@ export {
   ɵɵtrustConstantHtml,
   ɵɵtrustConstantResourceUrl,
 } from './sanitization/sanitization';
+export {
+  ɵɵvalidateIframeAttribute,
+} from './sanitization/iframe_attrs_validation';
 export {
   noSideEffects as ɵnoSideEffects,
 } from './util/closure';

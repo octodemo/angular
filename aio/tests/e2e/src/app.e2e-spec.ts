@@ -1,4 +1,5 @@
-import { browser, by, element, ElementFinder } from 'protractor';
+import { ElementFinder, browser, by, element } from 'protractor';
+
 import { SitePage } from './app.po';
 
 describe('site App', () => {
@@ -9,23 +10,6 @@ describe('site App', () => {
     // (bigger than the app component's showTopMenuWidth).
     await SitePage.setWindowWidth(1200);
     page = new SitePage();
-  });
-
-  it('should show features text after clicking "Features"', async () => {
-    await page.navigateTo('');
-    await page.click(page.getTopMenuLink('features'));
-    expect(await page.getDocViewerText()).toMatch(/Progressive web apps/i);
-  });
-
-  it('should set appropriate window titles', async () => {
-    await page.navigateTo('');
-    expect(await browser.getTitle()).toBe('Angular');
-
-    await page.click(page.getTopMenuLink('features'));
-    expect(await browser.getTitle()).toBe('Angular - FEATURES & BENEFITS');
-
-    await page.click(page.homeLink);
-    expect(await browser.getTitle()).toBe('Angular');
   });
 
   it('should not navigate when clicking on nav-item headings (sub-menu toggles)', async () => {
@@ -74,14 +58,10 @@ describe('site App', () => {
     }
   });
 
-  it('should show the tutorial index page at `/tutorial` after jitterbugging through features', async () => {
-    // check that we can navigate directly to the tutorial page
-    await page.navigateTo('tutorial');
-    expect(await page.getDocViewerText()).toMatch(/Tour of Heroes App and Tutorial/i);
-
-    // navigate to a different page
-    await page.click(page.getTopMenuLink('features'));
-    expect(await page.getDocViewerText()).toMatch(/Progressive web apps/i);
+  it('should show the ToH home page at `/tutorial/tour-of-heroes` after jitterbugging through features', async () => {
+    // check that we can navigate directly to the tour-of-heroes page
+    await page.navigateTo('tutorial/tour-of-heroes');
+    expect(await page.getDocViewerText()).toMatch(/Tour of Heroes application and tutorial/i);
 
     // Show the menu
     await page.click(page.docsMenuLink);
@@ -93,9 +73,9 @@ describe('site App', () => {
   });
 
   it('should render `{@example}` dgeni tags as `<code-example>` elements with HTML escaped content', async () => {
-    await page.navigateTo('guide/component-styles');
-    const codeExample = element.all(by.css('code-example')).first();
-    expect(await page.getInnerHtml(codeExample)).toContain('&lt;h1&gt;Tour of Heroes&lt;/h1&gt;');
+    await page.navigateTo('api/common/NgIf');
+    const codeExample = element.all(by.css('code-example[region="NgIfSimple"]')).first();
+    expect(await page.getInnerHtml(codeExample)).toContain('&lt;br&gt;');
   });
 
   describe('scrolling to the top', () => {
@@ -125,7 +105,7 @@ describe('site App', () => {
 
   describe('tutorial docs', () => {
     it('should not render a paragraph element inside the h1 element', async () => {
-      await page.navigateTo('tutorial/toh-pt1');
+      await page.navigateTo('tutorial/tour-of-heroes/toh-pt1');
       expect(await element(by.css('h1 p')).isPresent()).toBeFalsy();
     });
   });
@@ -182,23 +162,23 @@ describe('site App', () => {
 
   describe('google analytics', () => {
 
-    it('should call ga with initial URL', async () => {
+    it('should call legacy ga with initial URL', async () => {
       await page.navigateTo('api');
 
       const path = await page.locationPath();
-      const calls = await page.ga();
+      const calls = await page.legacyGa();
 
       // The last call (length-1) will be the `send` command
       // The second to last call (length-2) will be the command to `set` the page url
       expect(calls[calls.length - 2]).toEqual(['set', 'page', path]);
     });
 
-    it('should call ga with new URL on navigation', async () => {
+    it('should call legacy ga with new URL on navigation', async () => {
       await page.navigateTo('');
-      await page.click(page.getTopMenuLink('features'));
+      await page.click(page.getTopMenuLink('resources'));
 
       const path = await page.locationPath();
-      const calls = await page.ga();
+      const calls = await page.legacyGa();
 
       // The last call (length-1) will be the `send` command
       // The second to last call (length-2) will be the command to `set` the page url
@@ -214,7 +194,7 @@ describe('site App', () => {
       await page.navigateTo('does/not/exist');
       expect(await element(by.css('meta[name="robots"][content="noindex"]')).isPresent()).toBeTruthy();
 
-      await page.click(page.getTopMenuLink('features'));
+      await page.click(page.getTopMenuLink('resources'));
       expect(await element(by.css('meta[name="robots"]')).isPresent()).toBeFalsy();
     });
 
@@ -228,16 +208,16 @@ describe('site App', () => {
 
   describe('suggest edit link', () => {
     it('should be present on all docs pages', async () => {
-      await page.navigateTo('tutorial/toh-pt1');
+      await page.navigateTo('tutorial/tour-of-heroes/toh-pt1');
       expect(await page.ghLinks.count()).toEqual(1);
       /* eslint-disable max-len */
       expect(await page.ghLinks.get(0).getAttribute('href'))
-        .toMatch(/https:\/\/github\.com\/angular\/angular\/edit\/master\/aio\/content\/tutorial\/toh-pt1\.md\?message=docs%3A%20describe%20your%20change\.\.\./);
+        .toMatch(/https:\/\/github\.com\/angular\/angular\/edit\/main\/aio\/content\/tutorial\/tour-of-heroes\/toh-pt1\.md\?message=docs%3A%20describe%20your%20change\.\.\./);
 
       await page.navigateTo('guide/router');
       expect(await page.ghLinks.count()).toEqual(1);
       expect(await page.ghLinks.get(0).getAttribute('href'))
-        .toMatch(/https:\/\/github\.com\/angular\/angular\/edit\/master\/aio\/content\/guide\/router\.md\?message=docs%3A%20describe%20your%20change\.\.\./);
+        .toMatch(/https:\/\/github\.com\/angular\/angular\/edit\/main\/aio\/content\/guide\/router\.md\?message=docs%3A%20describe%20your%20change\.\.\./);
       /* eslint-enable max-len */
     });
 

@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import {runfiles} from '@bazel/runfiles';
 import * as path from 'path';
 
 const EXT = /(\.ts|\.d\.ts|\.js|\.jsx|\.tsx)$/;
@@ -61,6 +62,7 @@ export function createTsConfig(options: TsConfigOptions) {
       'target': options.target,
       // we have to set this as the default tsconfig is made of es6 mode
       'es5Mode': true,
+      'devmode': true,
       'manifest': createManifestPath(options),
       'compilationTargetSrc': options.compilationTargetSrc,
       // Override this property from the real tsconfig we read
@@ -70,7 +72,7 @@ export function createTsConfig(options: TsConfigOptions) {
       // we don't copy the node_modules into our tmp dir, so we should look in
       // the original workspace directory for it
       'nodeModulesPrefix':
-          path.join(require.resolve('npm/node_modules/typescript/package.json'), '../../'),
+          path.join(runfiles.resolve('npm/node_modules/typescript/package.json'), '../../'),
     },
     'files': options.files,
     'angularCompilerOptions': {

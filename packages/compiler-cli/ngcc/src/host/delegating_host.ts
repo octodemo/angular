@@ -6,12 +6,12 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import {ClassDeclaration, ClassMember, CtorParameter, Declaration, DeclarationNode, Decorator, FunctionDefinition, Import, ReflectionHost} from '../../../src/ngtsc/reflection';
 import {isFromDtsFile} from '../../../src/ngtsc/util/src/typescript';
 
-import {NgccClassSymbol, NgccReflectionHost, SwitchableVariableDeclaration} from './ngcc_host';
+import {NgccClassSymbol, NgccReflectionHost} from './ngcc_host';
 
 /**
  * A reflection host implementation that delegates reflector queries depending on whether they
@@ -150,10 +150,6 @@ export class DelegatingReflectionHost implements NgccReflectionHost {
     return this.ngccHost.getDecoratorsOfSymbol(symbol);
   }
 
-  getSwitchableDeclarations(module: ts.Node): SwitchableVariableDeclaration[] {
-    return this.ngccHost.getSwitchableDeclarations(module);
-  }
-
   getEndOfClass(classSymbol: NgccClassSymbol): ts.Node {
     return this.ngccHost.getEndOfClass(classSymbol);
   }
@@ -162,7 +158,7 @@ export class DelegatingReflectionHost implements NgccReflectionHost {
     return this.ngccHost.detectKnownDeclaration(decl);
   }
 
-  isStaticallyExported(clazz: ClassDeclaration): boolean {
-    return this.ngccHost.isStaticallyExported(clazz);
+  isStaticallyExported(decl: ts.Node): boolean {
+    return this.ngccHost.isStaticallyExported(decl);
   }
 }

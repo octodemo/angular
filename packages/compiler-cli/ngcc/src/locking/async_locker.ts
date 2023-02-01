@@ -49,7 +49,7 @@ export class AsyncLocker {
     for (let attempts = 0; attempts < this.retryAttempts; attempts++) {
       try {
         return this.lockFile.write();
-      } catch (e) {
+      } catch (e: any) {
         if (e.code !== 'EEXIST') {
           throw e;
         }
@@ -70,7 +70,7 @@ export class AsyncLocker {
         await new Promise(resolve => setTimeout(resolve, this.retryDelay));
       }
     }
-    // If we fall out of the loop then we ran out of rety attempts
+    // If we fall out of the loop then we ran out of retry attempts
     throw new TimeoutError(
         `Timed out waiting ${
             this.retryAttempts * this.retryDelay /

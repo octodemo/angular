@@ -9,8 +9,10 @@ import {scheduleMicroTask} from '../util';
 
 /**
  * Provides programmatic control of a reusable animation sequence,
- * built using the `build()` method of `AnimationBuilder`. The `build()` method
- * returns a factory, whose `create()` method instantiates and initializes this interface.
+ * built using the <code>[AnimationBuilder.build](api/animations/AnimationBuilder#build)()</code>
+ * method which returns an `AnimationFactory`, whose
+ * <code>[create](api/animations/AnimationFactory#create)()</code> method instantiates and
+ * initializes this interface.
  *
  * @see `AnimationBuilder`
  * @see `AnimationFactory`
@@ -121,6 +123,8 @@ export class NoopAnimationPlayer implements AnimationPlayer {
   private _onDoneFns: Function[] = [];
   private _onStartFns: Function[] = [];
   private _onDestroyFns: Function[] = [];
+  private _originalOnDoneFns: Function[] = [];
+  private _originalOnStartFns: Function[] = [];
   private _started = false;
   private _destroyed = false;
   private _finished = false;
@@ -138,9 +142,11 @@ export class NoopAnimationPlayer implements AnimationPlayer {
     }
   }
   onStart(fn: () => void): void {
+    this._originalOnStartFns.push(fn);
     this._onStartFns.push(fn);
   }
   onDone(fn: () => void): void {
+    this._originalOnDoneFns.push(fn);
     this._onDoneFns.push(fn);
   }
   onDestroy(fn: () => void): void {
@@ -186,6 +192,9 @@ export class NoopAnimationPlayer implements AnimationPlayer {
   }
   reset(): void {
     this._started = false;
+    this._finished = false;
+    this._onStartFns = this._originalOnStartFns;
+    this._onDoneFns = this._originalOnDoneFns;
   }
   setPosition(position: number): void {
     this._position = this.totalTime ? position * this.totalTime : 1;

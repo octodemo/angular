@@ -6,18 +6,16 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {compileClassMetadata, CompileClassMetadataFn, compileDeclareClassMetadata, compileDeclareInjectableFromMetadata, compileInjectable, createR3ProviderExpression, Expression, FactoryTarget, LiteralExpr, R3ClassMetadata, R3CompiledExpression, R3DependencyMetadata, R3InjectableMetadata, R3ProviderExpression, Statement, WrappedNodeExpr} from '@angular/compiler';
-import * as ts from 'typescript';
+import {compileClassMetadata, CompileClassMetadataFn, compileDeclareClassMetadata, compileDeclareInjectableFromMetadata, compileInjectable, createMayBeForwardRefExpression, FactoryTarget, ForwardRefHandling, LiteralExpr, MaybeForwardRefExpression, R3ClassMetadata, R3CompiledExpression, R3DependencyMetadata, R3InjectableMetadata, WrappedNodeExpr} from '@angular/compiler';
+import ts from 'typescript';
 
+import {InjectableClassRegistry, isAbstractClassDeclaration} from '../../annotations/common';
 import {ErrorCode, FatalDiagnosticError} from '../../diagnostics';
-import {InjectableClassRegistry} from '../../metadata';
+import {PartialEvaluator} from '../../partial_evaluator';
 import {PerfEvent, PerfRecorder} from '../../perf';
 import {ClassDeclaration, Decorator, ReflectionHost, reflectObjectLiteral} from '../../reflection';
-import {AnalysisOutput, CompileResult, DecoratorHandler, DetectResult, HandlerPrecedence} from '../../transform';
-
-import {compileDeclareFactory, CompileFactoryFn, compileNgFactoryDefField} from './factory';
-import {extractClassMetadata} from './metadata';
-import {findAngularDecorator, getConstructorDependencies, getValidConstructorDependencies, isAngularCore, toFactoryMetadata, tryUnwrapForwardRef, unwrapConstructorDependencies, validateConstructorDependencies, wrapTypeReference} from './util';
+import {AnalysisOutput, CompileResult, DecoratorHandler, DetectResult, HandlerPrecedence, ResolveResult} from '../../transform';
+import {checkInheritanceOfInjectable, compileDeclareFactory, CompileFactoryFn, compileNgFactoryDefField, extractClassMetadata, findAngularDecorator, getConstructorDependencies, getValidConstructorDependencies, isAngularCore, toFactoryMetadata, tryUnwrapForwardRef, unwrapConstructorDependencies, validateConstructorDependencies, wrapTypeReference,} from '../common';
 
 export interface InjectableHandlerData {
   meta: R3InjectableMetadata;
@@ -32,7 +30,8 @@ export interface InjectableHandlerData {
 export class InjectableDecoratorHandler implements
     DecoratorHandler<Decorator, InjectableHandlerData, null, unknown> {
   constructor(
-      private reflector: ReflectionHost, private isCore: boolean, private strictCtorDeps: boolean,
+      private reflector: ReflectionHost, private evaluator: PartialEvaluator,
+      private isCore: boolean, private strictCtorDeps: boolean,
       private injectableRegistry: InjectableClassRegistry, private perf: PerfRecorder,
       /**
        * What to do if the injectable already contains a ɵprov property.
@@ -86,8 +85,26 @@ export class InjectableDecoratorHandler implements
     return null;
   }
 
-  register(node: ClassDeclaration): void {
-    this.injectableRegistry.registerInjectable(node);
+  register(node: ClassDeclaration, analysis: InjectableHandlerData): void {
+    this.injectableRegistry.registerInjectable(node, {
+      ctorDeps: analysis.ctorDeps,
+    });
+  }
+
+  resolve(node: ClassDeclaration, analysis: Readonly<InjectableHandlerData>, symbol: null):
+      ResolveResult<unknown> {
+    if (requiresValidCtor(analysis.meta)) {
+      const diagnostic = checkInheritanceOfInjectable(
+          node, this.injectableRegistry, this.reflector, this.evaluator, this.strictCtorDeps,
+          'Injectable');
+      if (diagnostic !== null) {
+        return {
+          diagnostics: [diagnostic],
+        };
+      }
+    }
+
+    return {};
   }
 
   compileFull(node: ClassDeclaration, analysis: Readonly<InjectableHandlerData>): CompileResult[] {
@@ -162,7 +179,7 @@ function extractInjectableMetadata(
       type,
       typeArgumentCount,
       internalType,
-      providedIn: createR3ProviderExpression(new LiteralExpr(null), false),
+      providedIn: createMayBeForwardRefExpression(new LiteralExpr(null), ForwardRefHandling.None),
     };
   } else if (decorator.args.length === 1) {
     const metaNode = decorator.args[0];
@@ -180,7 +197,7 @@ function extractInjectableMetadata(
 
     const providedIn = meta.has('providedIn') ?
         getProviderExpression(meta.get('providedIn')!, reflector) :
-        createR3ProviderExpression(new LiteralExpr(null), false);
+        createMayBeForwardRefExpression(new LiteralExpr(null), ForwardRefHandling.None);
 
     let deps: R3DependencyMetadata[]|undefined = undefined;
     if ((meta.has('useClass') || meta.has('useFactory')) && meta.has('deps')) {
@@ -220,10 +237,11 @@ function extractInjectableMetadata(
  * object to indicate whether the value needed unwrapping.
  */
 function getProviderExpression(
-    expression: ts.Expression, reflector: ReflectionHost): R3ProviderExpression {
+    expression: ts.Expression, reflector: ReflectionHost): MaybeForwardRefExpression {
   const forwardRefValue = tryUnwrapForwardRef(expression, reflector);
-  return createR3ProviderExpression(
-      new WrappedNodeExpr(forwardRefValue ?? expression), forwardRefValue !== null);
+  return createMayBeForwardRefExpression(
+      new WrappedNodeExpr(forwardRefValue ?? expression),
+      forwardRefValue !== null ? ForwardRefHandling.Unwrapped : ForwardRefHandling.None);
 }
 
 function extractInjectableCtorDeps(
@@ -246,7 +264,7 @@ function extractInjectableCtorDeps(
     // To deal with this, @Injectable() without an argument is more lenient, and if the
     // constructor signature does not work for DI then a factory definition (ɵfac) that throws is
     // generated.
-    if (strictCtorDeps) {
+    if (strictCtorDeps && !isAbstractClassDeclaration(clazz)) {
       ctorDeps = getValidConstructorDependencies(clazz, reflector, isCore);
     } else {
       ctorDeps =
@@ -257,9 +275,9 @@ function extractInjectableCtorDeps(
   } else if (decorator.args.length === 1) {
     const rawCtorDeps = getConstructorDependencies(clazz, reflector, isCore);
 
-    if (strictCtorDeps && meta.useValue === undefined && meta.useExisting === undefined &&
-        meta.useClass === undefined && meta.useFactory === undefined) {
-      // Since use* was not provided, validate the deps according to strictCtorDeps.
+    if (strictCtorDeps && !isAbstractClassDeclaration(clazz) && requiresValidCtor(meta)) {
+      // Since use* was not provided for a concrete class, validate the deps according to
+      // strictCtorDeps.
       ctorDeps = validateConstructorDependencies(clazz, rawCtorDeps);
     } else {
       ctorDeps = unwrapConstructorDependencies(rawCtorDeps);
@@ -267,6 +285,11 @@ function extractInjectableCtorDeps(
   }
 
   return ctorDeps;
+}
+
+function requiresValidCtor(meta: R3InjectableMetadata): boolean {
+  return meta.useValue === undefined && meta.useExisting === undefined &&
+      meta.useClass === undefined && meta.useFactory === undefined;
 }
 
 function getDep(dep: ts.Expression, reflector: ReflectionHost): R3DependencyMetadata {
@@ -280,10 +303,10 @@ function getDep(dep: ts.Expression, reflector: ReflectionHost): R3DependencyMeta
   };
 
   function maybeUpdateDecorator(
-      dec: ts.Identifier, reflector: ReflectionHost, token?: ts.Expression): void {
+      dec: ts.Identifier, reflector: ReflectionHost, token?: ts.Expression): boolean {
     const source = reflector.getImportOfIdentifier(dec);
     if (source === null || source.from !== '@angular/core') {
-      return;
+      return false;
     }
     switch (source.name) {
       case 'Inject':
@@ -300,16 +323,23 @@ function getDep(dep: ts.Expression, reflector: ReflectionHost): R3DependencyMeta
       case 'Self':
         meta.self = true;
         break;
+      default:
+        return false;
     }
+    return true;
   }
 
   if (ts.isArrayLiteralExpression(dep)) {
     dep.elements.forEach(el => {
+      let isDecorator = false;
       if (ts.isIdentifier(el)) {
-        maybeUpdateDecorator(el, reflector);
+        isDecorator = maybeUpdateDecorator(el, reflector);
       } else if (ts.isNewExpression(el) && ts.isIdentifier(el.expression)) {
         const token = el.arguments && el.arguments.length > 0 && el.arguments[0] || undefined;
-        maybeUpdateDecorator(el.expression, reflector, token);
+        isDecorator = maybeUpdateDecorator(el.expression, reflector, token);
+      }
+      if (!isDecorator) {
+        meta.token = new WrappedNodeExpr(el);
       }
     });
   }

@@ -6,7 +6,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {browserDetection} from '@angular/platform-browser/testing/src/browser_util';
 import {BrowserViewportScroller, ViewportScroller} from '../src/viewport_scroller';
 
 describe('BrowserViewportScroller', () => {
@@ -42,7 +41,12 @@ describe('BrowserViewportScroller', () => {
 
   describe('scrollToAnchor', () => {
     // Testing scroll behavior does not make sense outside a browser
-    if (isNode) return;
+    if (isNode) {
+      // Jasmine will throw if there are no tests.
+      it('should pass', () => {});
+      return;
+    }
+
     const anchor = 'anchor';
     let scroller: BrowserViewportScroller;
 
@@ -75,11 +79,6 @@ describe('BrowserViewportScroller', () => {
     });
 
     it('should scroll when element with matching id is found inside the shadow DOM', () => {
-      // This test is only relevant for browsers that support shadow DOM.
-      if (!browserDetection.supportsShadowDom) {
-        return;
-      }
-
       const {anchorNode, cleanup} = createTallElementWithShadowRoot();
       anchorNode.id = anchor;
       scroller.scrollToAnchor(anchor);
@@ -88,11 +87,6 @@ describe('BrowserViewportScroller', () => {
     });
 
     it('should scroll when anchor with matching name is found inside the shadow DOM', () => {
-      // This test is only relevant for browsers that support shadow DOM.
-      if (!browserDetection.supportsShadowDom) {
-        return;
-      }
-
       const {anchorNode, cleanup} = createTallElementWithShadowRoot();
       anchorNode.name = anchor;
       scroller.scrollToAnchor(anchor);
